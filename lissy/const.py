@@ -1,0 +1,2 @@
+DOMAIN = "lissy"
+UPDATE_INTERVAL_HOURS = 4

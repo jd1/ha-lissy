@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Lissy Bibliothek Anmeldung",
+        "data": {
+          "username": "Ausweisnummer",
+          "password": "PIN / Passwort",
+          "base_url": "Lissy URL"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Ungültige Anmeldedaten",
+      "cannot_connect": "Verbindung zum Bibliotheksportal fehlgeschlagen"
+    },
+    "abort": {
+      "already_configured": "Dieses Bibliothekskonto ist bereits eingerichtet",
+      "already_in_progress": "Einrichtung läuft bereits"
+    }
+  }
+}

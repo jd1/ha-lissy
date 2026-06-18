@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Lissy Library Login",
+        "data": {
+          "username": "Library card number",
+          "password": "PIN / Password",
+          "base_url": "Lissy URL"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid credentials",
+      "cannot_connect": "Cannot connect to library portal"
+    },
+    "abort": {
+      "already_configured": "This library account is already configured",
+      "already_in_progress": "Configuration is already in progress"
+    }
+  }
+}

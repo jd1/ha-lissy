@@ -1,0 +1,14 @@
+renew:
+  name: Renew loans
+  description: Renew all or a specific borrowed item in a Lissy library account.
+  target:
+    entity:
+      domain: sensor
+      integration: lissy
+  fields:
+    mednr:
+      name: Media number
+      description: Renew only this item. Leave empty to renew all.
+      required: false
+      selector:
+        text:
