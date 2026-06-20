@@ -52,9 +52,9 @@ class LissyClient:
             raise LissyConnectionError(str(e)) from e
 
         try:
-            c         = re.search(r'[?&]c=(hr[a-z0-9]+)', text, re.IGNORECASE).group(1)
-            mgcnum    = re.search(r'[?&]mgcnum=(HR[A-Z0-9]+)', text, re.IGNORECASE).group(1)
-            bnrlgncke = re.search(r'[?&]bnrlgncke=(hr[a-z0-9]+)', text, re.IGNORECASE).group(1)
+            c         = re.search(r'[?&]c=([a-z0-9]+)', text, re.IGNORECASE).group(1)
+            mgcnum    = re.search(r'[?&]mgcnum=([A-Z0-9]+)', text, re.IGNORECASE).group(1)
+            bnrlgncke = re.search(r'[?&]bnrlgncke=([a-z0-9]+)', text, re.IGNORECASE).group(1)
         except AttributeError as e:
             _LOGGER.warning("Login page HTML (first 5000 chars): %s", text[:5000])
             raise LissyConnectionError("Unexpected login page structure") from e
@@ -69,7 +69,7 @@ class LissyClient:
         except aiohttp.ClientError as e:
             raise LissyConnectionError(str(e)) from e
 
-        m = re.search(r'[?&]c=(hr[a-z0-9]+)', text2, re.IGNORECASE)
+        m = re.search(r'[?&]c=([a-z0-9]+)', text2, re.IGNORECASE)
         if not m:
             _LOGGER.debug("Post-login page HTML: %s", text2[:2000])
             raise LissyAuthError("Login failed — bad credentials or unexpected response")
@@ -82,7 +82,7 @@ class LissyClient:
             r.raise_for_status()
             top_text = await r.text(encoding="latin-1")
 
-        pgnr_m = re.search(r'pgnr=(HR0[A-Z0-9]+)', top_text)
+        pgnr_m = re.search(r'pgnr=([A-Z0-9]+)', top_text)
         pgnr = pgnr_m.group(1) if pgnr_m else ""
 
         async with session.get(self._base_url, params={
