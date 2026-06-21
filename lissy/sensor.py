@@ -6,6 +6,7 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -67,6 +68,7 @@ class _LissyBase(CoordinatorEntity[LissyCoordinator], SensorEntity):
 
 class LissyCountSensor(_LissyBase):
     _attr_icon = "mdi:book-multiple"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coordinator: LissyCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator, entry)
@@ -89,6 +91,7 @@ class LissyCountSensor(_LissyBase):
 
 class LissyNextDueSensor(_LissyBase):
     _attr_icon = "mdi:calendar-clock"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coordinator: LissyCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator, entry)
@@ -151,9 +154,9 @@ class LissyItemSensor(_LissyBase):
         if not item:
             return {}
         return {
-            "mednr":     item["mednr"],
-            "medientyp": item["medientyp"],
-            "hinweis":   item["hinweis"],
+            "mednr":      item["mednr"],
+            "medientyp":  item["medientyp"],
+            "hinweis":    item["hinweis"],
         }
 
 
