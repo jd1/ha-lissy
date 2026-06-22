@@ -1,0 +1,59 @@
+"""Lissy calendar — one calendar per account, one all-day event per loan."""
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+from typing import Any
+
+from homeassistant.components.calendar import CalendarEntity, CalendarEvent
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from .const import DOMAIN
+from .coordinator import LissyCoordinator
+from .sensor import _parse_leihfrist
+
+
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
+    coordinator: LissyCoordinator = hass.data[DOMAIN][entry.entry_id]
+    async_add_entities([LissyCalendar(coordinator, entry)])
+
+
+class LissyCalendar(CoordinatorEntity[LissyCoordinator], CalendarEntity):
+    _attr_icon = "mdi:library"
+
+    def __init__(self, coordinator: LissyCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_calendar"
+        self._attr_name = entry.title
+
+    def _all_events(self) -> list[CalendarEvent]:
+        events = []
+        for item in (self.coordinator.data or []):
+            d = _parse_leihfrist(item["leihfrist"])
+            if d:
+                events.append(CalendarEvent(
+                    start=d,
+                    end=d + timedelta(days=1),
+                    summary=item["kurztitel"],
+                ))
+        return events
+
+    @property
+    def event(self) -> CalendarEvent | None:
+        events = self._all_events()
+        if not events:
+            return None
+        return min(events, key=lambda e: e.start)
+
+    async def async_get_events(
+        self, hass: HomeAssistant, start_date: datetime, end_date: datetime
+    ) -> list[CalendarEvent]:
+        return [
+            e for e in self._all_events()
+            if start_date.date() <= e.start <= end_date.date()
+        ]

@@ -9,7 +9,7 @@ from .api import LissyClient
 from .const import DOMAIN
 from .coordinator import LissyCoordinator
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "calendar"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
