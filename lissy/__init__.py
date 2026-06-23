@@ -49,27 +49,30 @@ def _register_services(hass: HomeAssistant) -> None:
 
     async def handle_renew(call: ServiceCall) -> None:
         from homeassistant.helpers import entity_registry as er
-        mednr = call.data.get("mednr")
-
-        # Resolve targeted entities → config entry IDs → coordinators
         target_entities = call.data.get("entity_id")
+
         if target_entities:
             reg = er.async_get(hass)
-            entry_ids = {
-                reg.async_get(eid).config_entry_id
-                for eid in target_entities
-                if reg.async_get(eid) and reg.async_get(eid).config_entry_id
-            }
-            coordinators = [
-                hass.data[DOMAIN][eid]
-                for eid in entry_ids
-                if eid in hass.data.get(DOMAIN, {})
-            ]
+            # Group targeted entities by coordinator, extracting mednr for item sensors
+            tasks: dict[str, str | None] = {}  # entry_id → mednr or None (=all)
+            for eid in target_entities:
+                entry = reg.async_get(eid)
+                if not entry or not entry.config_entry_id:
+                    continue
+                cid = entry.config_entry_id
+                # unique_id pattern for item sensors: {entry_id}_item_{mednr}
+                if entry.unique_id and "_item_" in entry.unique_id:
+                    mednr = entry.unique_id.split("_item_", 1)[1]
+                    tasks.setdefault(cid, mednr)  # first item wins if multiple targeted
+                else:
+                    tasks[cid] = None  # calendar or summary → renew all
         else:
-            coordinators = list(hass.data.get(DOMAIN, {}).values())
+            raise ValueError("A target entity must be provided")
 
-        for coordinator in coordinators:
-            await coordinator.client.renew(mednr)
-            await coordinator.async_request_refresh()
+        for entry_id, mednr in tasks.items():
+            coordinator = hass.data[DOMAIN].get(entry_id)
+            if coordinator:
+                await coordinator.client.renew(mednr)
+                await coordinator.async_request_refresh()
 
     hass.services.async_register(DOMAIN, "renew", handle_renew)
