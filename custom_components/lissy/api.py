@@ -38,7 +38,6 @@ class LissyClient:
         self._username = username
         self._password = password
         self._base_url = base_url
-        self._c: str | None = None
 
     def _new_session(self) -> aiohttp.ClientSession:
         return aiohttp.ClientSession(headers=_HEADERS)
@@ -110,7 +109,7 @@ class LissyClient:
             cells = tr.find_all("td")
             if len(cells) < 6:
                 continue
-            img_src  = cells[1].find("img")["src"] if cells[1].find("img") else ""
+            img_src  = cells[1].find("img").get("src", "") if cells[1].find("img") else ""
             raw_type = img_src.split("/")[-1].replace(".gif", "").lower()
             rows.append({
                 "mednr":     cells[2].get_text(strip=True).replace("​", ""),

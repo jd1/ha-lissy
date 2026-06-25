@@ -12,7 +12,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, ITEM_ID_SEP
 from .coordinator import LissyCoordinator
 
 
@@ -98,28 +98,25 @@ class LissyNextDueSensor(_LissyBase):
         self._attr_unique_id = f"{entry.entry_id}_next_due"
         self._attr_name = f"{entry.title} Next Due"
 
-    @property
-    def native_value(self) -> str | None:
-        dates = [
+    def _earliest(self) -> tuple[date, dict[str, Any]] | None:
+        dated = [
             (d, m)
             for m in (self.coordinator.data or [])
             if (d := _parse_leihfrist(m["leihfrist"])) is not None
         ]
-        if not dates:
-            return None
-        earliest_date, earliest_item = min(dates, key=lambda x: x[0])
-        return earliest_date.isoformat()
+        return min(dated, key=lambda x: x[0]) if dated else None
+
+    @property
+    def native_value(self) -> str | None:
+        e = self._earliest()
+        return e[0].isoformat() if e else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        dates = [
-            (d, m)
-            for m in (self.coordinator.data or [])
-            if (d := _parse_leihfrist(m["leihfrist"])) is not None
-        ]
-        if not dates:
+        e = self._earliest()
+        if not e:
             return {}
-        _, item = min(dates, key=lambda x: x[0])
+        _, item = e
         return {"mednr": item["mednr"], "title": item["kurztitel"], "type": item["medientyp"]}
 
 
@@ -129,7 +126,7 @@ class LissyItemSensor(_LissyBase):
     def __init__(self, coordinator: LissyCoordinator, entry: ConfigEntry, item: dict[str, Any]) -> None:
         super().__init__(coordinator, entry)
         self._mednr = item["mednr"]
-        self._attr_unique_id = f"{entry.entry_id}_item_{self._mednr}"
+        self._attr_unique_id = f"{entry.entry_id}{ITEM_ID_SEP}{self._mednr}"
         self._attr_name = item["kurztitel"]
         self._attr_icon = _icon_for_type(item["medientyp"])
 
@@ -142,16 +139,14 @@ class LissyItemSensor(_LissyBase):
 
     @property
     def native_value(self) -> str | None:
-        item = self._item()
-        if not item:
+        if not (item := self._item()):
             return None
         d = _parse_leihfrist(item["leihfrist"])
         return d.isoformat() if d else item["leihfrist"]
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        item = self._item()
-        if not item:
+        if not (item := self._item()):
             return {}
         return {
             "mednr":      item["mednr"],

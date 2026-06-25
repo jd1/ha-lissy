@@ -1,2 +1,3 @@
 DOMAIN = "lissy"
 UPDATE_INTERVAL_HOURS = 4
+ITEM_ID_SEP = "_item_"

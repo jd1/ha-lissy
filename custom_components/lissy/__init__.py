@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 
 from .api import LissyClient
-from .const import DOMAIN
+from .const import DOMAIN, ITEM_ID_SEP
 from .coordinator import LissyCoordinator
 
 PLATFORMS = ["sensor", "calendar"]
@@ -40,6 +41,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         hass.data[DOMAIN].pop(entry.entry_id)
+        if not hass.data[DOMAIN]:
+            hass.services.async_remove(DOMAIN, "renew")
     return unloaded
 
 
@@ -61,13 +64,13 @@ def _register_services(hass: HomeAssistant) -> None:
                     continue
                 cid = entry.config_entry_id
                 # unique_id pattern for item sensors: {entry_id}_item_{mednr}
-                if entry.unique_id and "_item_" in entry.unique_id:
-                    mednr = entry.unique_id.split("_item_", 1)[1]
+                if entry.unique_id and ITEM_ID_SEP in entry.unique_id:
+                    mednr = entry.unique_id.split(ITEM_ID_SEP, 1)[1]
                     tasks.setdefault(cid, mednr)  # first item wins if multiple targeted
                 else:
                     tasks[cid] = None  # calendar or summary → renew all
         else:
-            raise ValueError("A target entity must be provided")
+            raise ServiceValidationError("A target entity must be provided")
 
         for entry_id, mednr in tasks.items():
             coordinator = hass.data[DOMAIN].get(entry_id)
