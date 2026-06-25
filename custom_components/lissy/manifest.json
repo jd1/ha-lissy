@@ -3,8 +3,8 @@
   "name": "Lissy Library",
   "version": "0.1.0",
   "config_flow": true,
-  "documentation": "",
+  "documentation": "https://github.com/jd1/ha-lissy",
   "requirements": ["beautifulsoup4==4.12.3"],
-  "codeowners": [],
+  "codeowners": ["@jd1"],
   "iot_class": "cloud_polling"
 }
