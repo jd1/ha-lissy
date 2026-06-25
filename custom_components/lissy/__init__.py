@@ -1,4 +1,5 @@
 """Lissy Library integration."""
+
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
@@ -52,6 +53,7 @@ def _register_services(hass: HomeAssistant) -> None:
 
     async def handle_renew(call: ServiceCall) -> None:
         from homeassistant.helpers import entity_registry as er
+
         target_entities = call.data.get("entity_id")
 
         if target_entities:

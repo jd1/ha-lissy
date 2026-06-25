@@ -1,4 +1,5 @@
 """Lissy calendar — one calendar per account, one all-day event per loan."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -42,14 +43,16 @@ class LissyCalendar(CoordinatorEntity[LissyCoordinator], CalendarEntity):
 
     def _all_events(self) -> list[CalendarEvent]:
         events = []
-        for item in (self.coordinator.data or []):
+        for item in self.coordinator.data or []:
             d = _parse_leihfrist(item["leihfrist"])
             if d:
-                events.append(CalendarEvent(
-                    start=d,
-                    end=d + timedelta(days=1),
-                    summary=item["kurztitel"],
-                ))
+                events.append(
+                    CalendarEvent(
+                        start=d,
+                        end=d + timedelta(days=1),
+                        summary=item["kurztitel"],
+                    )
+                )
         return events
 
     @property
@@ -63,6 +66,7 @@ class LissyCalendar(CoordinatorEntity[LissyCoordinator], CalendarEntity):
         self, hass: HomeAssistant, start_date: datetime, end_date: datetime
     ) -> list[CalendarEvent]:
         return [
-            e for e in self._all_events()
+            e
+            for e in self._all_events()
             if start_date.date() <= e.start <= end_date.date()
         ]

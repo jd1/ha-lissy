@@ -1,4 +1,5 @@
 """Config flow for Lissy."""
+
 from __future__ import annotations
 
 import voluptuous as vol
@@ -8,11 +9,13 @@ from homeassistant.data_entry_flow import FlowResult
 from .api import DEFAULT_BASE_URL, LissyAuthError, LissyClient, LissyConnectionError
 from .const import DOMAIN
 
-STEP_SCHEMA = vol.Schema({
-    vol.Required("username"): str,
-    vol.Required("password"): str,
-    vol.Optional("base_url", default=DEFAULT_BASE_URL): str,
-})
+STEP_SCHEMA = vol.Schema(
+    {
+        vol.Required("username"): str,
+        vol.Required("password"): str,
+        vol.Optional("base_url", default=DEFAULT_BASE_URL): str,
+    }
+)
 
 
 class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):

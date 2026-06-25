@@ -1,4 +1,5 @@
 """Tests for LissyClient — uses real HTML shapes."""
+
 from __future__ import annotations
 
 import pytest
@@ -17,27 +18,27 @@ from api import (
 
 # Real login page is a frameset; c/mgcnum/bnrlgncke appear in frame src attrs
 LOGIN_PAGE_HTML = (
-    '<frameset>'
+    "<frameset>"
     '<frame src="/lissy/lissy.ly?pg=getpage&type=topeframe&pgaction=noframegen'
-    '&c=hz0k0t5r0t5s0t5t&option1=showcvbutton&targetpage=bnrlogin'
+    "&c=hz0k0t5r0t5s0t5t&option1=showcvbutton&targetpage=bnrlogin"
     '&mgcnum=HZ0K0T5H&bnrlgncke=hz0k0t5r0t5s0t5t" />'
     '<frame src="/lissy/lissy.ly?pg=getpage&type=bottomeframe&pgaction=noframegen'
     '&c=hz0k0t5r0t5s0t5t" />'
-    '</frameset>'
+    "</frameset>"
 )
 
 POST_LOGIN_HTML = (
-    '<html><body>'
+    "<html><body>"
     '<a href="/lissy/lissy.ly?pg=anzeige&c=ab1cd2ef3gh4">Meine Ausleihen</a>'
-    '</body></html>'
+    "</body></html>"
 )
 
 POST_LOGIN_BAD_HTML = "<html><body>Ungültige Anmeldedaten</body></html>"
 
 TOPFRAME_HTML = (
-    '<html><body>'
+    "<html><body>"
     '<a href="?pgnr=ENTL001&c=ab1cd2ef3gh4">Entleihungen</a>'
-    '</body></html>'
+    "</body></html>"
 )
 
 LOANS_HTML = """
@@ -65,9 +66,9 @@ LOANS_HTML = """
 """
 
 RENEW_FRAMESET_HTML = (
-    '<frameset>'
+    "<frameset>"
     '<frame name="toprightframe" src="/lissy/lissy.ly?pg=result&c=ab1cd2ef3gh4" />'
-    '</frameset>'
+    "</frameset>"
 )
 
 RENEW_RESULT_HTML = """
@@ -98,6 +99,7 @@ CHECKBOXES_HTML = """
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _mock_response(text: str, status: int = 200) -> MagicMock:
     r = MagicMock()
     r.status = status
@@ -108,9 +110,11 @@ def _mock_response(text: str, status: int = 200) -> MagicMock:
 
 def _cm(response: MagicMock):
     """Wrap a mock response in an async context manager."""
+
     @asynccontextmanager
     async def _inner(*_a, **_kw):
         yield response
+
     return _inner
 
 
@@ -135,6 +139,7 @@ def _make_session(*responses):
 # ---------------------------------------------------------------------------
 # _parse_rows
 # ---------------------------------------------------------------------------
+
 
 def test_parse_rows_empty():
     assert LissyClient._parse_rows("<html></html>") == []
@@ -165,6 +170,7 @@ def test_parse_rows_unknown_media_type():
 # _parse_checkboxes
 # ---------------------------------------------------------------------------
 
+
 def test_parse_checkboxes():
     result = LissyClient._parse_checkboxes(CHECKBOXES_HTML)
     assert result == [
@@ -186,6 +192,7 @@ def test_parse_checkboxes_empty():
 # ---------------------------------------------------------------------------
 # _login
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_login_success():
@@ -213,7 +220,9 @@ async def test_login_bad_credentials_raises_auth_error():
 async def test_login_malformed_page_raises_connection_error():
     client = LissyClient("user123", "pass456")
     session = MagicMock()
-    session.get = MagicMock(side_effect=_cm(_mock_response("<html>nothing here</html>")))
+    session.get = MagicMock(
+        side_effect=_cm(_mock_response("<html>nothing here</html>"))
+    )
 
     with pytest.raises(LissyConnectionError, match="Unexpected login page structure"):
         await client._login(session)
@@ -222,6 +231,7 @@ async def test_login_malformed_page_raises_connection_error():
 @pytest.mark.asyncio
 async def test_login_network_error_raises_connection_error():
     import aiohttp
+
     client = LissyClient("user123", "pass456")
     session = MagicMock()
 
@@ -239,6 +249,7 @@ async def test_login_network_error_raises_connection_error():
 # ---------------------------------------------------------------------------
 # list_loans
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_list_loans():
@@ -261,6 +272,7 @@ async def test_list_loans():
 # ---------------------------------------------------------------------------
 # renew
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_renew_all():

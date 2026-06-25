@@ -1,4 +1,5 @@
 """Async Lissy scraper — logic ported from lissy.py."""
+
 from __future__ import annotations
 
 import logging
@@ -13,8 +14,12 @@ _LOGGER = logging.getLogger(__name__)
 DEFAULT_BASE_URL = "https://stb.schwaebisch-gmuend.de/lissy/lissy.ly"
 
 _MEDIA_TYPE_MAP = {
-    "buch": "Buch", "zeitsc": "Zeitschrift", "spiel": "Spiel/Puzzle",
-    "cd": "CD", "dvd": "DVD", "hörbuch": "Hörbuch",
+    "buch": "Buch",
+    "zeitsc": "Zeitschrift",
+    "spiel": "Spiel/Puzzle",
+    "cd": "CD",
+    "dvd": "DVD",
+    "hörbuch": "Hörbuch",
 }
 
 _HEADERS = {
@@ -34,7 +39,9 @@ class LissyConnectionError(Exception):
 
 
 class LissyClient:
-    def __init__(self, username: str, password: str, base_url: str = DEFAULT_BASE_URL) -> None:
+    def __init__(
+        self, username: str, password: str, base_url: str = DEFAULT_BASE_URL
+    ) -> None:
         self._username = username
         self._password = password
         self._base_url = base_url
@@ -51,42 +58,65 @@ class LissyClient:
             raise LissyConnectionError(str(e)) from e
 
         try:
-            c         = re.search(r'[?&]c=([a-z0-9]+)', text, re.IGNORECASE).group(1)
-            mgcnum    = re.search(r'[?&]mgcnum=([A-Z0-9]+)', text, re.IGNORECASE).group(1)
-            bnrlgncke = re.search(r'[?&]bnrlgncke=([a-z0-9]+)', text, re.IGNORECASE).group(1)
+            c = re.search(r"[?&]c=([a-z0-9]+)", text, re.IGNORECASE).group(1)
+            mgcnum = re.search(r"[?&]mgcnum=([A-Z0-9]+)", text, re.IGNORECASE).group(1)
+            bnrlgncke = re.search(
+                r"[?&]bnrlgncke=([a-z0-9]+)", text, re.IGNORECASE
+            ).group(1)
         except AttributeError as e:
             _LOGGER.warning("Login page HTML (first 5000 chars): %s", text[:5000])
             raise LissyConnectionError("Unexpected login page structure") from e
 
         try:
-            async with session.post(self._base_url, data={
-                "pg": "login", "mgcnum": mgcnum, "bnrlgncke": bnrlgncke,
-                "bnr": self._username, "gd": self._password,
-            }, allow_redirects=True) as r2:
+            async with session.post(
+                self._base_url,
+                data={
+                    "pg": "login",
+                    "mgcnum": mgcnum,
+                    "bnrlgncke": bnrlgncke,
+                    "bnr": self._username,
+                    "gd": self._password,
+                },
+                allow_redirects=True,
+            ) as r2:
                 r2.raise_for_status()
                 text2 = await r2.text(encoding="latin-1")
         except aiohttp.ClientError as e:
             raise LissyConnectionError(str(e)) from e
 
-        m = re.search(r'[?&]c=([a-z0-9]+)', text2, re.IGNORECASE)
+        m = re.search(r"[?&]c=([a-z0-9]+)", text2, re.IGNORECASE)
         if not m:
             _LOGGER.debug("Post-login page HTML: %s", text2[:2000])
-            raise LissyAuthError("Login failed — bad credentials or unexpected response")
+            raise LissyAuthError(
+                "Login failed — bad credentials or unexpected response"
+            )
         return m.group(1)
 
     async def _entl_html(self, session: aiohttp.ClientSession, c: str) -> str:
-        async with session.get(self._base_url, params={
-            "pg": "getpage", "type": "topframe", "pgaction": "noframegen", "c": c,
-        }) as r:
+        async with session.get(
+            self._base_url,
+            params={
+                "pg": "getpage",
+                "type": "topframe",
+                "pgaction": "noframegen",
+                "c": c,
+            },
+        ) as r:
             r.raise_for_status()
             top_text = await r.text(encoding="latin-1")
 
-        pgnr_m = re.search(r'pgnr=([A-Z0-9]+)', top_text)
+        pgnr_m = re.search(r"pgnr=([A-Z0-9]+)", top_text)
         pgnr = pgnr_m.group(1) if pgnr_m else ""
 
-        async with session.get(self._base_url, params={
-            "pg": "anzeige", "type": "entl", "c": c, "pgnr": pgnr,
-        }) as r:
+        async with session.get(
+            self._base_url,
+            params={
+                "pg": "anzeige",
+                "type": "entl",
+                "c": c,
+                "pgnr": pgnr,
+            },
+        ) as r:
             r.raise_for_status()
             text = await r.text(encoding="latin-1")
 
@@ -100,7 +130,7 @@ class LissyClient:
 
     @staticmethod
     def _parse_rows(html: str) -> list[dict[str, Any]]:
-        soup  = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, "html.parser")
         table = soup.find("table")
         if not table:
             return []
@@ -109,15 +139,19 @@ class LissyClient:
             cells = tr.find_all("td")
             if len(cells) < 6:
                 continue
-            img_src  = cells[1].find("img").get("src", "") if cells[1].find("img") else ""
+            img_src = (
+                cells[1].find("img").get("src", "") if cells[1].find("img") else ""
+            )
             raw_type = img_src.split("/")[-1].replace(".gif", "").lower()
-            rows.append({
-                "mednr":     cells[2].get_text(strip=True).replace("​", ""),
-                "medientyp": _MEDIA_TYPE_MAP.get(raw_type, raw_type),
-                "kurztitel": cells[3].get_text(strip=True).replace("​", ""),
-                "leihfrist": cells[4].get_text(strip=True).replace("​", ""),
-                "hinweis":   cells[5].get_text(strip=True).replace("​", ""),
-            })
+            rows.append(
+                {
+                    "mednr": cells[2].get_text(strip=True).replace("​", ""),
+                    "medientyp": _MEDIA_TYPE_MAP.get(raw_type, raw_type),
+                    "kurztitel": cells[3].get_text(strip=True).replace("​", ""),
+                    "leihfrist": cells[4].get_text(strip=True).replace("​", ""),
+                    "hinweis": cells[5].get_text(strip=True).replace("​", ""),
+                }
+            )
         return rows
 
     @staticmethod
@@ -139,7 +173,7 @@ class LissyClient:
 
     async def renew(self, target_mednr: str | None = None) -> dict[str, Any]:
         async with self._new_session() as session:
-            c    = await self._login(session)
+            c = await self._login(session)
             html = await self._entl_html(session, c)
             all_media = self._parse_checkboxes(html)
 
@@ -148,7 +182,8 @@ class LissyClient:
 
             to_renew = (
                 [m for m in all_media if m["value"] == target_mednr]
-                if target_mednr else all_media
+                if target_mednr
+                else all_media
             )
             if target_mednr and not to_renew:
                 raise ValueError(f"Med.nr. {target_mednr} not found")
@@ -161,31 +196,37 @@ class LissyClient:
                 r.raise_for_status()
                 text = await r.text(encoding="latin-1")
 
-            soup_fs     = BeautifulSoup(text, "html.parser")
+            soup_fs = BeautifulSoup(text, "html.parser")
             right_frame = soup_fs.find("frame", attrs={"name": "toprightframe"})
             if right_frame:
-                host      = self._base_url.split("/lissy/")[0]
+                host = self._base_url.split("/lissy/")[0]
                 frame_url = host + right_frame["src"].replace("??&&", "?")
                 async with session.get(frame_url) as r:
                     r.raise_for_status()
                     text = await r.text(encoding="latin-1")
 
-            soup  = BeautifulSoup(text, "html.parser")
+            soup = BeautifulSoup(text, "html.parser")
             table = soup.find("table")
             if not table:
-                renewed = [{"mednr": m["value"], "verlaengert": "unknown"} for m in to_renew]
+                renewed = [
+                    {"mednr": m["value"], "verlaengert": "unknown"} for m in to_renew
+                ]
             else:
                 renewed = []
                 for tr in table.find_all("tr")[1:]:
                     cells = tr.find_all("td")
                     if len(cells) < 4:
                         continue
-                    renewed.append({
-                        "mednr":       cells[0].get_text(strip=True),
-                        "leihfrist":   cells[2].get_text(strip=True),
-                        "verlaengert": cells[3].get_text(strip=True),
-                        "grund":       cells[4].get_text(strip=True) if len(cells) > 4 else "",
-                    })
+                    renewed.append(
+                        {
+                            "mednr": cells[0].get_text(strip=True),
+                            "leihfrist": cells[2].get_text(strip=True),
+                            "verlaengert": cells[3].get_text(strip=True),
+                            "grund": (
+                                cells[4].get_text(strip=True) if len(cells) > 4 else ""
+                            ),
+                        }
+                    )
 
             updated_list = self._parse_rows(await self._entl_html(session, c))
             return {"renewed": renewed, "list": updated_list}

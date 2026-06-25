@@ -1,4 +1,5 @@
 """Lissy sensors."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -20,10 +21,12 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: LissyCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([
-        LissyCountSensor(coordinator, entry),
-        LissyNextDueSensor(coordinator, entry),
-    ])
+    async_add_entities(
+        [
+            LissyCountSensor(coordinator, entry),
+            LissyNextDueSensor(coordinator, entry),
+        ]
+    )
 
     known: set[str] = set()
 
@@ -117,13 +120,19 @@ class LissyNextDueSensor(_LissyBase):
         if not e:
             return {}
         _, item = e
-        return {"mednr": item["mednr"], "title": item["kurztitel"], "type": item["medientyp"]}
+        return {
+            "mednr": item["mednr"],
+            "title": item["kurztitel"],
+            "type": item["medientyp"],
+        }
 
 
 class LissyItemSensor(_LissyBase):
     """One sensor per borrowed item. State = due date, available = still on loan."""
 
-    def __init__(self, coordinator: LissyCoordinator, entry: ConfigEntry, item: dict[str, Any]) -> None:
+    def __init__(
+        self, coordinator: LissyCoordinator, entry: ConfigEntry, item: dict[str, Any]
+    ) -> None:
         super().__init__(coordinator, entry)
         self._mednr = item["mednr"]
         self._attr_unique_id = f"{entry.entry_id}{ITEM_ID_SEP}{self._mednr}"
@@ -131,7 +140,10 @@ class LissyItemSensor(_LissyBase):
         self._attr_icon = _icon_for_type(item["medientyp"])
 
     def _item(self) -> dict[str, Any] | None:
-        return next((m for m in (self.coordinator.data or []) if m["mednr"] == self._mednr), None)
+        return next(
+            (m for m in (self.coordinator.data or []) if m["mednr"] == self._mednr),
+            None,
+        )
 
     @property
     def available(self) -> bool:
@@ -149,9 +161,9 @@ class LissyItemSensor(_LissyBase):
         if not (item := self._item()):
             return {}
         return {
-            "mednr":      item["mednr"],
-            "medientyp":  item["medientyp"],
-            "hinweis":    item["hinweis"],
+            "mednr": item["mednr"],
+            "medientyp": item["medientyp"],
+            "hinweis": item["hinweis"],
         }
 
 
