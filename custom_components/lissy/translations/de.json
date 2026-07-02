@@ -8,6 +8,13 @@
           "password": "PIN / Passwort",
           "base_url": "Lissy URL"
         }
+      },
+      "reauth_confirm": {
+        "title": "Lissy Bibliothek Anmeldung",
+        "data": {
+          "username": "Ausweisnummer",
+          "password": "PIN / Passwort"
+        }
       }
     },
     "error": {
@@ -16,7 +23,8 @@
     },
     "abort": {
       "already_configured": "Dieses Bibliothekskonto ist bereits eingerichtet",
-      "already_in_progress": "Einrichtung läuft bereits"
+      "already_in_progress": "Einrichtung läuft bereits",
+      "reauth_successful": "Erneute Anmeldung erfolgreich"
     }
   }
 }

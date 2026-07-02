@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 
-from .api import LissyClient
+from .api import LissyAuthError, LissyClient, LissyConnectionError
 from .const import DOMAIN, ITEM_ID_SEP
 from .coordinator import LissyCoordinator
 
-PLATFORMS = ["sensor", "calendar"]
+PLATFORMS = [Platform.SENSOR, Platform.CALENDAR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -55,29 +56,40 @@ def _register_services(hass: HomeAssistant) -> None:
         from homeassistant.helpers import entity_registry as er
 
         target_entities = call.data.get("entity_id")
-
-        if target_entities:
-            reg = er.async_get(hass)
-            # Group targeted entities by coordinator, extracting mednr for item sensors
-            tasks: dict[str, str | None] = {}  # entry_id → mednr or None (=all)
-            for eid in target_entities:
-                entry = reg.async_get(eid)
-                if not entry or not entry.config_entry_id:
-                    continue
-                cid = entry.config_entry_id
-                # unique_id pattern for item sensors: {entry_id}_item_{mednr}
-                if entry.unique_id and ITEM_ID_SEP in entry.unique_id:
-                    mednr = entry.unique_id.split(ITEM_ID_SEP, 1)[1]
-                    tasks.setdefault(cid, mednr)  # first item wins if multiple targeted
-                else:
-                    tasks[cid] = None  # calendar or summary → renew all
-        else:
+        if not target_entities:
             raise ServiceValidationError("A target entity must be provided")
 
-        for entry_id, mednr in tasks.items():
+        reg = er.async_get(hass)
+        # Group targeted entities by coordinator. Value is a set of mednrs to
+        # renew, or None meaning "renew all loans for this account".
+        tasks: dict[str, set[str] | None] = {}
+        for eid in target_entities:
+            entry = reg.async_get(eid)
+            if not entry or not entry.config_entry_id:
+                continue
+            cid = entry.config_entry_id
+            # unique_id pattern for item sensors: {entry_id}_item_{mednr}
+            if entry.unique_id and ITEM_ID_SEP in entry.unique_id:
+                mednr = entry.unique_id.split(ITEM_ID_SEP, 1)[1]
+                current = tasks.get(cid, set())
+                if current is not None:  # don't downgrade an existing "all"
+                    current.add(mednr)
+                    tasks[cid] = current
+            else:
+                tasks[cid] = None  # calendar or summary → renew all
+
+        for entry_id, targets in tasks.items():
             coordinator = hass.data[DOMAIN].get(entry_id)
-            if coordinator:
-                await coordinator.client.renew(mednr)
-                await coordinator.async_request_refresh()
+            if not coordinator:
+                continue
+            try:
+                result = await coordinator.client.renew(targets)
+            except ValueError as e:
+                raise ServiceValidationError(str(e)) from e
+            except (LissyAuthError, LissyConnectionError) as e:
+                raise HomeAssistantError(f"Renew failed: {e}") from e
+            # renew() already fetched the fresh loan list — reuse it instead of
+            # triggering a second full login + scrape.
+            coordinator.async_set_updated_data(result["list"])
 
     hass.services.async_register(DOMAIN, "renew", handle_renew)

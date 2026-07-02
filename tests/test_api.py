@@ -10,6 +10,7 @@ from api import (
     LissyAuthError,
     LissyClient,
     LissyConnectionError,
+    parse_leihfrist,
 )
 
 # ---------------------------------------------------------------------------
@@ -312,7 +313,7 @@ async def test_renew_target_mednr():
         _mock_response(LOANS_HTML),
     )
     with patch.object(client, "_new_session", return_value=mock_session):
-        result = await client.renew(target_mednr="12345678")
+        result = await client.renew(targets={"12345678"})
 
     assert len(result["renewed"]) == 1
 
@@ -328,7 +329,7 @@ async def test_renew_unknown_mednr_raises():
     )
     with patch.object(client, "_new_session", return_value=mock_session):
         with pytest.raises(ValueError, match="not found"):
-            await client.renew(target_mednr="99999999")
+            await client.renew(targets={"99999999"})
 
 
 @pytest.mark.asyncio
@@ -344,3 +345,52 @@ async def test_renew_no_media_returns_empty():
         result = await client.renew()
 
     assert result == {"renewed": [], "list": []}
+
+
+@pytest.mark.asyncio
+async def test_renew_multiple_targets_posts_all():
+    """H1: targeting several mednrs renews all of them in one login."""
+    client = LissyClient("user123", "pass456")
+    posted: dict = {}
+    responses = iter(
+        [
+            _mock_response(LOGIN_PAGE_HTML),
+            _mock_response(POST_LOGIN_HTML),
+            _mock_response(TOPFRAME_HTML),
+            _mock_response(CHECKBOXES_HTML + LOANS_HTML),
+            _mock_response(RENEW_FRAMESET_HTML),
+            _mock_response(RENEW_RESULT_HTML),
+            _mock_response(TOPFRAME_HTML),
+            _mock_response(LOANS_HTML),
+        ]
+    )
+    session = MagicMock()
+
+    def _get(*_a, **_kw):
+        return _cm(next(responses))()
+
+    def _post(url, data=None, **_kw):
+        posted.update(data or {})
+        return _cm(next(responses))()
+
+    session.get = MagicMock(side_effect=_get)
+    session.post = MagicMock(side_effect=_post)
+
+    @asynccontextmanager
+    async def _session_cm():
+        yield session
+
+    with patch.object(client, "_new_session", return_value=_session_cm()):
+        await client.renew(targets={"12345678", "87654321"})
+
+    # both checkbox values were included in the renew POST
+    assert {"12345678", "87654321"} <= set(posted.values())
+
+
+def test_parse_leihfrist_valid():
+    assert parse_leihfrist("30.06.2026").isoformat() == "2026-06-30"
+
+
+def test_parse_leihfrist_invalid():
+    assert parse_leihfrist("not a date") is None
+    assert parse_leihfrist("") is None

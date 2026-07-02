@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.config_entries import ConfigFlowResult
 
 from .api import DEFAULT_BASE_URL, LissyAuthError, LissyClient, LissyConnectionError
 from .const import DOMAIN
@@ -18,23 +21,31 @@ STEP_SCHEMA = vol.Schema(
 )
 
 
+async def _validate(user_input: dict[str, Any]) -> str | None:
+    """Return an error key, or None if the credentials work."""
+    client = LissyClient(
+        user_input["username"],
+        user_input["password"],
+        user_input.get("base_url", DEFAULT_BASE_URL),
+    )
+    try:
+        await client.list_loans()
+    except LissyAuthError:
+        return "invalid_auth"
+    except LissyConnectionError:
+        return "cannot_connect"
+    return None
+
+
 class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
-    async def async_step_user(self, user_input=None) -> FlowResult:
+    async def async_step_user(self, user_input=None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            client = LissyClient(
-                user_input["username"],
-                user_input["password"],
-                user_input.get("base_url", DEFAULT_BASE_URL),
-            )
-            try:
-                await client.list_loans()
-            except LissyAuthError:
-                errors["base"] = "invalid_auth"
-            except LissyConnectionError:
-                errors["base"] = "cannot_connect"
+            error = await _validate(user_input)
+            if error:
+                errors["base"] = error
             else:
                 await self.async_set_unique_id(user_input["username"])
                 self._abort_if_unique_id_configured()
@@ -45,4 +56,31 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user", data_schema=STEP_SCHEMA, errors=errors
+        )
+
+    async def async_step_reauth(
+        self, entry_data: Mapping[str, Any]
+    ) -> ConfigFlowResult:
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(self, user_input=None) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        reauth_entry = self._get_reauth_entry()
+        if user_input is not None:
+            merged = {**reauth_entry.data, **user_input}
+            error = await _validate(merged)
+            if error:
+                errors["base"] = error
+            else:
+                return self.async_update_reload_and_abort(reauth_entry, data=merged)
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("username"): str,
+                    vol.Required("password"): str,
+                }
+            ),
+            errors=errors,
         )

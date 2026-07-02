@@ -13,6 +13,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .api import parse_leihfrist
 from .const import DOMAIN, ITEM_ID_SEP
 from .coordinator import LissyCoordinator
 
@@ -42,17 +43,6 @@ async def async_setup_entry(
 
     _add_item_sensors()
     entry.async_on_unload(coordinator.async_add_listener(_add_item_sensors))
-
-
-def _parse_leihfrist(value: str) -> date | None:
-    """Parse DD.MM.YYYY from leihfrist string, return None on failure."""
-    try:
-        parts = value.strip().split(".")
-        if len(parts) == 3:
-            return date(int(parts[2]), int(parts[1]), int(parts[0]))
-    except (ValueError, IndexError):
-        pass
-    return None
 
 
 class _LissyBase(CoordinatorEntity[LissyCoordinator], SensorEntity):
@@ -105,7 +95,7 @@ class LissyNextDueSensor(_LissyBase):
         dated = [
             (d, m)
             for m in (self.coordinator.data or [])
-            if (d := _parse_leihfrist(m["leihfrist"])) is not None
+            if (d := parse_leihfrist(m["leihfrist"])) is not None
         ]
         return min(dated, key=lambda x: x[0]) if dated else None
 
@@ -153,7 +143,7 @@ class LissyItemSensor(_LissyBase):
     def native_value(self) -> str | None:
         if not (item := self._item()):
             return None
-        d = _parse_leihfrist(item["leihfrist"])
+        d = parse_leihfrist(item["leihfrist"])
         return d.isoformat() if d else item["leihfrist"]
 
     @property

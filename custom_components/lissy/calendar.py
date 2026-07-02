@@ -12,9 +12,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .api import parse_leihfrist
 from .const import DOMAIN
 from .coordinator import LissyCoordinator
-from .sensor import _parse_leihfrist
 
 
 async def async_setup_entry(
@@ -44,7 +44,7 @@ class LissyCalendar(CoordinatorEntity[LissyCoordinator], CalendarEntity):
     def _all_events(self) -> list[CalendarEvent]:
         events = []
         for item in self.coordinator.data or []:
-            d = _parse_leihfrist(item["leihfrist"])
+            d = parse_leihfrist(item["leihfrist"])
             if d:
                 events.append(
                     CalendarEvent(

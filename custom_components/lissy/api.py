@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import date
 from typing import Any
 
 import aiohttp
@@ -12,6 +13,7 @@ from bs4 import BeautifulSoup
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_BASE_URL = "https://stb.schwaebisch-gmuend.de/lissy/lissy.ly"
+_TIMEOUT = aiohttp.ClientTimeout(total=30)
 
 _MEDIA_TYPE_MAP = {
     "buch": "Buch",
@@ -28,6 +30,17 @@ _HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     )
 }
+
+
+def parse_leihfrist(value: str) -> date | None:
+    """Parse DD.MM.YYYY from a leihfrist string, return None on failure."""
+    try:
+        parts = value.strip().split(".")
+        if len(parts) == 3:
+            return date(int(parts[2]), int(parts[1]), int(parts[0]))
+    except (ValueError, IndexError):
+        pass
+    return None
 
 
 class LissyAuthError(Exception):
@@ -47,7 +60,7 @@ class LissyClient:
         self._base_url = base_url
 
     def _new_session(self) -> aiohttp.ClientSession:
-        return aiohttp.ClientSession(headers=_HEADERS)
+        return aiohttp.ClientSession(headers=_HEADERS, timeout=_TIMEOUT)
 
     async def _login(self, session: aiohttp.ClientSession) -> str:
         try:
@@ -64,7 +77,7 @@ class LissyClient:
                 r"[?&]bnrlgncke=([a-z0-9]+)", text, re.IGNORECASE
             ).group(1)
         except AttributeError as e:
-            _LOGGER.warning("Login page HTML (first 5000 chars): %s", text[:5000])
+            _LOGGER.debug("Login page HTML (first 5000 chars): %s", text[:5000])
             raise LissyConnectionError("Unexpected login page structure") from e
 
         try:
@@ -171,7 +184,8 @@ class LissyClient:
             html = await self._entl_html(session, c)
         return self._parse_rows(html)
 
-    async def renew(self, target_mednr: str | None = None) -> dict[str, Any]:
+    async def renew(self, targets: set[str] | None = None) -> dict[str, Any]:
+        """Renew loans. ``targets`` = mednrs to renew, or None for all."""
         async with self._new_session() as session:
             c = await self._login(session)
             html = await self._entl_html(session, c)
@@ -181,12 +195,14 @@ class LissyClient:
                 return {"renewed": [], "list": []}
 
             to_renew = (
-                [m for m in all_media if m["value"] == target_mednr]
-                if target_mednr
+                [m for m in all_media if m["value"] in targets]
+                if targets
                 else all_media
             )
-            if target_mednr and not to_renew:
-                raise ValueError(f"Med.nr. {target_mednr} not found")
+            if targets:
+                missing = targets - {m["value"] for m in to_renew}
+                if missing:
+                    raise ValueError(f"Med.nr. {', '.join(sorted(missing))} not found")
 
             data = {"pg": "verlaeng", "c": c, "medcnt": str(len(all_media))}
             for m in to_renew:
