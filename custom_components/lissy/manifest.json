@@ -1,10 +1,11 @@
 {
   "domain": "lissy",
   "name": "Lissy Library",
-  "version": "0.1.0",
+  "codeowners": ["@jd1"],
   "config_flow": true,
   "documentation": "https://github.com/jd1/ha-lissy",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/jd1/ha-lissy/issues",
   "requirements": ["beautifulsoup4==4.12.3"],
-  "codeowners": ["@jd1"],
-  "iot_class": "cloud_polling"
+  "version": "0.1.0"
 }

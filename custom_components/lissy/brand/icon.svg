@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background -->
+  <circle cx="256" cy="256" r="256" fill="#1565C0"/>
+
+  <!-- Shelf -->
+  <rect x="80" y="360" width="352" height="20" rx="6" fill="#5C3D1E"/>
+
+  <!-- Book 1 (red, tallest) -->
+  <rect x="100" y="180" width="56" height="180" rx="6" fill="#E53935"/>
+  <rect x="100" y="180" width="14" height="180" rx="4" fill="#B71C1C"/>
+
+  <!-- Book 2 (teal) -->
+  <rect x="164" y="210" width="52" height="150" rx="6" fill="#00897B"/>
+  <rect x="164" y="210" width="13" height="150" rx="4" fill="#00574B"/>
+
+  <!-- Book 3 (amber, tallest) -->
+  <rect x="224" y="190" width="60" height="170" rx="6" fill="#FFB300"/>
+  <rect x="224" y="190" width="15" height="170" rx="4" fill="#E65100"/>
+
+  <!-- Book 4 (purple) -->
+  <rect x="292" y="220" width="50" height="140" rx="6" fill="#8E24AA"/>
+  <rect x="292" y="220" width="12" height="140" rx="4" fill="#4A148C"/>
+
+  <!-- Book 5 (green, medium) -->
+  <rect x="350" y="200" width="54" height="160" rx="6" fill="#43A047"/>
+  <rect x="350" y="200" width="13" height="160" rx="4" fill="#1B5E20"/>
+</svg>

@@ -8,4 +8,3 @@ renew:
         integration: lissy
       - domain: sensor
         integration: lissy
-        entity_category: ~
