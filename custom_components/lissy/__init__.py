@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import config_validation as cv, device_registry as dr
 
 from .api import LissyAuthError, LissyClient, LissyConnectionError
 from .const import DOMAIN, ITEM_ID_SEP
@@ -92,4 +93,9 @@ def _register_services(hass: HomeAssistant) -> None:
             # triggering a second full login + scrape.
             coordinator.async_set_updated_data(result["list"])
 
-    hass.services.async_register(DOMAIN, "renew", handle_renew)
+    hass.services.async_register(
+        DOMAIN,
+        "renew",
+        handle_renew,
+        schema=vol.Schema({vol.Required("entity_id"): cv.entity_ids}),
+    )
