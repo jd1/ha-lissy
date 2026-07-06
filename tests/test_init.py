@@ -139,3 +139,22 @@ async def test_renew_unknown_mednr_is_validation_error(hass):
             {"entity_id": "sensor.lissy_12345_book_one"},
             blocking=True,
         )
+
+
+async def test_returned_book_entity_is_removed(hass):
+    """Returning a book removes its entity from the registry entirely."""
+    from custom_components.lissy.const import DOMAIN as _DOMAIN
+
+    entry, _ = await _setup(hass)
+    reg = er.async_get(hass)
+
+    assert reg.async_get("sensor.lissy_12345_book_one") is not None
+    assert reg.async_get("sensor.lissy_12345_dvd_two") is not None
+
+    # Push updated data (book_one returned) directly into the coordinator
+    coordinator = hass.data[_DOMAIN][entry.entry_id]
+    coordinator.async_set_updated_data([LOANS[1]])
+    await hass.async_block_till_done()
+
+    assert reg.async_get("sensor.lissy_12345_book_one") is None
+    assert reg.async_get("sensor.lissy_12345_dvd_two") is not None

@@ -9,6 +9,7 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -30,8 +31,11 @@ async def async_setup_entry(
     )
 
     known: set[str] = set()
+    er_instance = er.async_get(hass)
 
-    def _add_item_sensors() -> None:
+    def _sync_item_sensors() -> None:
+        current = {item["mednr"] for item in (coordinator.data or [])}
+
         new = [
             LissyItemSensor(coordinator, entry, item)
             for item in (coordinator.data or [])
@@ -41,8 +45,15 @@ async def async_setup_entry(
             known.update(s._mednr for s in new)
             async_add_entities(new)
 
-    _add_item_sensors()
-    entry.async_on_unload(coordinator.async_add_listener(_add_item_sensors))
+        for mednr in known - current:
+            unique_id = f"{entry.entry_id}{ITEM_ID_SEP}{mednr}"
+            entity_id = er_instance.async_get_entity_id("sensor", DOMAIN, unique_id)
+            if entity_id:
+                er_instance.async_remove(entity_id)
+        known.intersection_update(current)
+
+    _sync_item_sensors()
+    entry.async_on_unload(coordinator.async_add_listener(_sync_item_sensors))
 
 
 class _LissyBase(CoordinatorEntity[LissyCoordinator], SensorEntity):
