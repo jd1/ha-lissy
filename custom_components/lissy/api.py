@@ -97,13 +97,13 @@ class LissyClient:
         except aiohttp.ClientError as e:
             raise LissyConnectionError(str(e)) from e
 
-        m = re.search(r"[?&]c=([a-z0-9]+)", text2, re.IGNORECASE)
-        if not m:
+        match = re.search(r"[?&]c=([a-z0-9]+)", text2, re.IGNORECASE)
+        if not match:
             _LOGGER.debug("Post-login page HTML: %s", text2[:2000])
             raise LissyAuthError(
                 "Login failed — bad credentials or unexpected response"
             )
-        return m.group(1)
+        return match.group(1)
 
     async def _entl_html(self, session: aiohttp.ClientSession, c: str) -> str:
         async with session.get(
@@ -118,8 +118,8 @@ class LissyClient:
             r.raise_for_status()
             top_text = await r.text(encoding="latin-1")
 
-        pgnr_m = re.search(r"pgnr=([A-Z0-9]+)", top_text)
-        pgnr = pgnr_m.group(1) if pgnr_m else ""
+        pgnr_match = re.search(r"pgnr=([A-Z0-9]+)", top_text)
+        pgnr = pgnr_match.group(1) if pgnr_match else ""
 
         async with session.get(
             self._base_url,
@@ -133,10 +133,10 @@ class LissyClient:
             r.raise_for_status()
             text = await r.text(encoding="latin-1")
 
-        js = re.search(r"window\.location\.replace\(['\"]([^'\"]+)['\"]", text)
-        if js:
+        redirect = re.search(r"window\.location\.replace\(['\"]([^'\"]+)['\"]", text)
+        if redirect:
             host = self._base_url.split("/lissy/")[0]
-            async with session.get(host + js.group(1)) as r:
+            async with session.get(host + redirect.group(1)) as r:
                 r.raise_for_status()
                 text = await r.text(encoding="latin-1")
         return text
@@ -212,8 +212,8 @@ class LissyClient:
                 r.raise_for_status()
                 text = await r.text(encoding="latin-1")
 
-            soup_fs = BeautifulSoup(text, "html.parser")
-            right_frame = soup_fs.find("frame", attrs={"name": "toprightframe"})
+            frameset = BeautifulSoup(text, "html.parser")
+            right_frame = frameset.find("frame", attrs={"name": "toprightframe"})
             if right_frame:
                 host = self._base_url.split("/lissy/")[0]
                 frame_url = host + right_frame["src"].replace("??&&", "?")

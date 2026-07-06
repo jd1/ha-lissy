@@ -44,12 +44,12 @@ class LissyCalendar(CoordinatorEntity[LissyCoordinator], CalendarEntity):
     def _all_events(self) -> list[CalendarEvent]:
         events = []
         for item in self.coordinator.data or []:
-            d = parse_leihfrist(item["leihfrist"])
-            if d:
+            due_date = parse_leihfrist(item["leihfrist"])
+            if due_date:
                 events.append(
                     CalendarEvent(
-                        start=d,
-                        end=d + timedelta(days=1),
+                        start=due_date,
+                        end=due_date + timedelta(days=1),
                         summary=item["kurztitel"],
                     )
                 )

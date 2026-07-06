@@ -93,23 +93,23 @@ class LissyNextDueSensor(_LissyBase):
 
     def _earliest(self) -> tuple[date, dict[str, Any]] | None:
         dated = [
-            (d, m)
+            (due_date, m)
             for m in (self.coordinator.data or [])
-            if (d := parse_leihfrist(m["leihfrist"])) is not None
+            if (due_date := parse_leihfrist(m["leihfrist"])) is not None
         ]
         return min(dated, key=lambda x: x[0]) if dated else None
 
     @property
     def native_value(self) -> str | None:
-        e = self._earliest()
-        return e[0].isoformat() if e else None
+        earliest = self._earliest()
+        return earliest[0].isoformat() if earliest else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        e = self._earliest()
-        if not e:
+        earliest = self._earliest()
+        if not earliest:
             return {}
-        _, item = e
+        _, item = earliest
         return {
             "mednr": item["mednr"],
             "title": item["kurztitel"],

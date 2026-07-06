@@ -63,23 +63,23 @@ def _register_services(hass: HomeAssistant) -> None:
         reg = er.async_get(hass)
         # Group targeted entities by coordinator. Value is a set of mednrs to
         # renew, or None meaning "renew all loans for this account".
-        tasks: dict[str, set[str] | None] = {}
-        for eid in target_entities:
-            entry = reg.async_get(eid)
+        targets_by_entry: dict[str, set[str] | None] = {}
+        for entity_id in target_entities:
+            entry = reg.async_get(entity_id)
             if not entry or not entry.config_entry_id:
                 continue
-            cid = entry.config_entry_id
+            config_entry_id = entry.config_entry_id
             # unique_id pattern for item sensors: {entry_id}_item_{mednr}
             if entry.unique_id and ITEM_ID_SEP in entry.unique_id:
                 mednr = entry.unique_id.split(ITEM_ID_SEP, 1)[1]
-                current = tasks.get(cid, set())
+                current = targets_by_entry.get(config_entry_id, set())
                 if current is not None:  # don't downgrade an existing "all"
                     current.add(mednr)
-                    tasks[cid] = current
+                    targets_by_entry[config_entry_id] = current
             else:
-                tasks[cid] = None  # calendar or summary → renew all
+                targets_by_entry[config_entry_id] = None  # calendar or summary → renew all
 
-        for entry_id, targets in tasks.items():
+        for entry_id, targets in targets_by_entry.items():
             coordinator = hass.data[DOMAIN].get(entry_id)
             if not coordinator:
                 continue
