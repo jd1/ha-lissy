@@ -6,6 +6,6 @@
   "documentation": "https://github.com/jd1/ha-lissy",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/jd1/ha-lissy/issues",
-  "requirements": ["beautifulsoup4==4.12.3"],
+  "requirements": ["beautifulsoup4==4.15.0"],
   "version": "0.1.0"
 }
