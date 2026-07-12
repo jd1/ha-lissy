@@ -1,10 +1,10 @@
 renew:
   name: Renew loans
   description: >
-    Target a book sensor to renew that item, or the account calendar to renew all loans for that account.
+    Target a book sensor to renew that item, or the Lissy device to renew all loans for that account.
   target:
+    device:
+      integration: lissy
     entity:
-      - domain: calendar
-        integration: lissy
       - domain: sensor
         integration: lissy

@@ -61,14 +61,19 @@ async def test_setup_creates_entities(hass):
     assert hass.states.get("calendar.lissy_12345") is not None
 
 
-async def test_renew_all_via_calendar(hass):
-    """Targeting the calendar renews all loans (targets=None)."""
-    _, client = await _setup(hass)
+async def test_renew_all_via_device(hass):
+    """Targeting the Lissy device renews all loans (targets=None)."""
+    from homeassistant.helpers import device_registry as dev_reg_helper
+
+    entry, client = await _setup(hass)
+    dev_reg = dev_reg_helper.async_get(hass)
+    device = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
 
     await hass.services.async_call(
         DOMAIN,
         "renew",
-        {"entity_id": "calendar.lissy_12345"},
+        {},
+        target={"device_id": device.id},
         blocking=True,
     )
     client.renew.assert_awaited_once_with(None)
@@ -111,6 +116,20 @@ async def test_renew_does_not_trigger_second_fetch(hass):
     assert client.list_loans.await_count == calls_before
     # coordinator state reflects the list renew() returned (one loan left)
     assert hass.states.get("sensor.lissy_12345_borrowed").state == "1"
+
+
+async def test_renew_summary_sensor_raises(hass):
+    """Targeting a non-item sensor (e.g. borrowed count) is a validation error."""
+    _, client = await _setup(hass)
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            "renew",
+            {"entity_id": "sensor.lissy_12345_borrowed"},
+            blocking=True,
+        )
+    client.renew.assert_not_awaited()
 
 
 async def test_renew_connection_error_surfaces(hass):

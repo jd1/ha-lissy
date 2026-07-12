@@ -36,8 +36,9 @@ During setup you will be asked for:
 
 ### `lissy.renew`
 
-Renews one or more borrowed items.
+Renews borrowed items.
 
-| Parameter | Description |
+| Target | Effect |
 |---|---|
-| `entity_id` | One or more item sensor entities to renew |
+| Lissy device | Renews all loans for that account |
+| Item sensor entity | Renews that specific item only |

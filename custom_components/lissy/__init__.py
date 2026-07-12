@@ -19,14 +19,23 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     async def handle_renew(call: ServiceCall) -> None:
         _target = getattr(call, "target", None) or {}
         raw = _target.get("entity_id") or call.data.get("entity_id")
-        if not raw:
-            raise ServiceValidationError("A target entity must be provided")
-        target_entities = raw if isinstance(raw, list) else [raw]
+        _raw_dev = _target.get("device_id") or call.data.get("device_id") or []
+        device_ids = _raw_dev if isinstance(_raw_dev, list) else [_raw_dev]
+        if not raw and not device_ids:
+            raise ServiceValidationError("A target entity or device must be provided")
+        target_entities = (raw if isinstance(raw, list) else [raw]) if raw else []
+
+        # Device targets → renew all loans for that account.
+        dev_reg = dr.async_get(hass)
+        targets_by_entry: dict[str, set[str] | None] = {}
+        for device_id in device_ids:
+            device = dev_reg.async_get(device_id)
+            if device:
+                for ceid in device.config_entries:
+                    if ceid in hass.data.get(DOMAIN, {}):
+                        targets_by_entry[ceid] = None
 
         reg = er.async_get(hass)
-        # Group targeted entities by coordinator. Value is a set of mednrs to
-        # renew, or None meaning "renew all loans for this account".
-        targets_by_entry: dict[str, set[str] | None] = {}
         for entity_id in target_entities:
             entry = reg.async_get(entity_id)
             if not entry or not entry.config_entry_id:
@@ -40,7 +49,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                     current.add(mednr)
                     targets_by_entry[config_entry_id] = current
             else:
-                targets_by_entry[config_entry_id] = None  # calendar or summary → renew all
+                raise ServiceValidationError(
+                    f"{entity_id} is not a renewable item sensor"
+                )
 
         for entry_id, targets in targets_by_entry.items():
             coordinator = hass.data.get(DOMAIN, {}).get(entry_id)
