@@ -6,7 +6,7 @@ import logging
 import re
 from datetime import date
 from enum import StrEnum
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -37,9 +37,19 @@ class LoanItem(TypedDict):
 
 class RenewResult(TypedDict):
     media_id: str
-    due_date: str
+    due_date: NotRequired[str]
     renewed: bool
     reason: str
+
+
+class _CheckboxInput(TypedDict):
+    name: str
+    value: str
+
+
+class RenewResponse(TypedDict):
+    renewed: list[RenewResult]
+    list: list[LoanItem]
 
 
 _MEDIA_TYPE_MAP: dict[str, MediaType] = {
@@ -197,7 +207,7 @@ class LissyClient:
         return rows
 
     @staticmethod
-    def _parse_checkboxes(html: str) -> list[dict[str, str]]:
+    def _parse_checkboxes(html: str) -> list[_CheckboxInput]:
         soup = BeautifulSoup(html, "html.parser")
         seen, result = set(), []
         for inp in soup.find_all("input", attrs={"name": re.compile(r"^mednr\d+$")}):
@@ -213,7 +223,7 @@ class LissyClient:
             html = await self._entl_html(session, c)
         return self._parse_rows(html)
 
-    async def renew(self, targets: set[str] | None = None) -> dict[str, list[LoanItem] | list[RenewResult]]:
+    async def renew(self, targets: set[str] | None = None) -> RenewResponse:
         """Renew loans. ``targets`` = mednrs to renew, or None for all."""
         async with self._new_session() as session:
             c = await self._login(session)
@@ -253,8 +263,9 @@ class LissyClient:
             soup = BeautifulSoup(text, "html.parser")
             table = soup.find("table")
             if not table:
+                _LOGGER.warning("Renewal response had no result table; assuming success")
                 renewed = [
-                    {"media_id": m["value"], "renewed": False, "reason": "no response table"} for m in to_renew
+                    {"media_id": m["value"], "renewed": True, "reason": ""} for m in to_renew
                 ]
             else:
                 renewed = []

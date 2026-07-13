@@ -4,19 +4,18 @@ from __future__ import annotations
 
 from datetime import timedelta
 import logging
-from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import LissyAuthError, LissyClient, LissyConnectionError
+from .api import LissyAuthError, LissyClient, LissyConnectionError, LoanItem
 from .const import DOMAIN, UPDATE_INTERVAL_HOURS
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class LissyCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
+class LissyCoordinator(DataUpdateCoordinator[list[LoanItem]]):
     def __init__(self, hass: HomeAssistant, client: LissyClient) -> None:
         super().__init__(
             hass,
@@ -26,7 +25,7 @@ class LissyCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         )
         self.client = client
 
-    async def _async_update_data(self) -> list[dict[str, Any]]:
+    async def _async_update_data(self) -> list[LoanItem]:
         try:
             return await self.client.list_loans()
         except LissyAuthError as e:
