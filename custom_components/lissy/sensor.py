@@ -14,7 +14,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .api import parse_leihfrist
+from .api import LoanItem, MediaType, parse_leihfrist
 from .const import DOMAIN, ITEM_ID_SEP
 from .coordinator import LissyCoordinator
 
@@ -34,21 +34,20 @@ async def async_setup_entry(
     er_instance = er.async_get(hass)
 
     def _sync_item_sensors() -> None:
-        current = {item["mednr"] for item in (coordinator.data or [])}
+        current = {item["media_id"] for item in (coordinator.data or [])}
 
         new = [
             LissyItemSensor(coordinator, entry, item)
             for item in (coordinator.data or [])
-            if item["mednr"] not in known
+            if item["media_id"] not in known
         ]
         if new:
-            known.update(s._mednr for s in new)
+            known.update(s._media_id for s in new)
             async_add_entities(new)
 
-        for mednr in known - current:
-            unique_id = f"{entry.entry_id}{ITEM_ID_SEP}{mednr}"
-            entity_id = er_instance.async_get_entity_id("sensor", DOMAIN, unique_id)
-            if entity_id:
+        for media_id in known - current:
+            unique_id = f"{entry.entry_id}{ITEM_ID_SEP}{media_id}"
+            if entity_id := er_instance.async_get_entity_id("sensor", DOMAIN, unique_id):
                 er_instance.async_remove(entity_id)
         known.intersection_update(current)
 
@@ -87,7 +86,7 @@ class LissyCountSensor(_LissyBase):
     def extra_state_attributes(self) -> dict[str, Any]:
         return {
             "items": [
-                {"mednr": m["mednr"], "title": m["kurztitel"], "due": m["leihfrist"]}
+                {"media_id": m["media_id"], "title": m["title"], "due": m["due_date"]}
                 for m in (self.coordinator.data or [])
             ]
         }
@@ -106,7 +105,7 @@ class LissyNextDueSensor(_LissyBase):
         dated = [
             (due_date, m)
             for m in (self.coordinator.data or [])
-            if (due_date := parse_leihfrist(m["leihfrist"])) is not None
+            if (due_date := parse_leihfrist(m["due_date"])) is not None
         ]
         return min(dated, key=lambda x: x[0]) if dated else None
 
@@ -122,9 +121,9 @@ class LissyNextDueSensor(_LissyBase):
             return {}
         _, item = earliest
         return {
-            "mednr": item["mednr"],
-            "title": item["kurztitel"],
-            "type": item["medientyp"],
+            "media_id": item["media_id"],
+            "title": item["title"],
+            "type": item["media_type"],
         }
 
 
@@ -132,17 +131,17 @@ class LissyItemSensor(_LissyBase):
     """One sensor per borrowed item. State = due date, available = still on loan."""
 
     def __init__(
-        self, coordinator: LissyCoordinator, entry: ConfigEntry, item: dict[str, Any]
+        self, coordinator: LissyCoordinator, entry: ConfigEntry, item: LoanItem
     ) -> None:
         super().__init__(coordinator, entry)
-        self._mednr = item["mednr"]
-        self._attr_unique_id = f"{entry.entry_id}{ITEM_ID_SEP}{self._mednr}"
-        self._attr_name = item["kurztitel"]
-        self._attr_icon = _icon_for_type(item["medientyp"])
+        self._media_id = item["media_id"]
+        self._attr_unique_id = f"{entry.entry_id}{ITEM_ID_SEP}{self._media_id}"
+        self._attr_name = item["title"]
+        self._attr_icon = _icon_for_type(item["media_type"])
 
-    def _item(self) -> dict[str, Any] | None:
+    def _item(self) -> LoanItem | None:
         return next(
-            (m for m in (self.coordinator.data or []) if m["mednr"] == self._mednr),
+            (m for m in (self.coordinator.data or []) if m["media_id"] == self._media_id),
             None,
         )
 
@@ -154,26 +153,26 @@ class LissyItemSensor(_LissyBase):
     def native_value(self) -> str | None:
         if not (item := self._item()):
             return None
-        d = parse_leihfrist(item["leihfrist"])
-        return d.isoformat() if d else item["leihfrist"]
+        d = parse_leihfrist(item["due_date"])
+        return d.isoformat() if d else item["due_date"]
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         if not (item := self._item()):
             return {}
         return {
-            "mednr": item["mednr"],
-            "medientyp": item["medientyp"],
-            "hinweis": item["hinweis"],
+            "media_id": item["media_id"],
+            "media_type": item["media_type"],
+            "note": item["note"],
         }
 
 
-def _icon_for_type(medientyp: str) -> str:
+def _icon_for_type(media_type: MediaType) -> str:
     return {
-        "Buch": "mdi:book-open-page-variant",
-        "Zeitschrift": "mdi:newspaper",
-        "CD": "mdi:disc",
-        "DVD": "mdi:disc-player",
-        "Hörbuch": "mdi:headphones",
-        "Spiel/Puzzle": "mdi:puzzle",
-    }.get(medientyp, "mdi:library")
+        MediaType.BOOK: "mdi:book-open-page-variant",
+        MediaType.MAGAZINE: "mdi:newspaper",
+        MediaType.CD: "mdi:disc",
+        MediaType.DVD: "mdi:disc-player",
+        MediaType.AUDIOBOOK: "mdi:headphones",
+        MediaType.GAME: "mdi:puzzle",
+    }.get(media_type, "mdi:library")

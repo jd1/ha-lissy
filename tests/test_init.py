@@ -14,18 +14,18 @@ from custom_components.lissy.const import DOMAIN
 
 LOANS = [
     {
-        "mednr": "111",
-        "medientyp": "Buch",
-        "kurztitel": "Book One",
-        "leihfrist": "30.06.2026",
-        "hinweis": "",
+        "media_id": "111",
+        "media_type": "book",
+        "title": "Book One",
+        "due_date": "30.06.2026",
+        "note": "",
     },
     {
-        "mednr": "222",
-        "medientyp": "DVD",
-        "kurztitel": "DVD Two",
-        "leihfrist": "15.07.2026",
-        "hinweis": "",
+        "media_id": "222",
+        "media_type": "dvd",
+        "title": "DVD Two",
+        "due_date": "15.07.2026",
+        "note": "",
     },
 ]
 
@@ -100,7 +100,7 @@ async def test_renew_multiple_items_same_account(hass):
 
 async def test_renew_does_not_trigger_second_fetch(hass):
     """H2: renew reuses the returned list; no extra list_loans call."""
-    renew = AsyncMock(return_value={"renewed": [{"mednr": "111", "verlaengert": True, "grund": ""}], "list": [LOANS[1]]})
+    renew = AsyncMock(return_value={"renewed": [{"media_id": "111", "renewed": True, "reason": ""}], "list": [LOANS[1]]})
     _, client = await _setup(hass, renew=renew)
     calls_before = client.list_loans.await_count
 
@@ -163,7 +163,7 @@ async def test_renew_unknown_mednr_is_validation_error(hass):
 async def test_renew_failure_surfaces_as_error(hass):
     """A Nein response from the library raises HomeAssistantError with the reason."""
     renew = AsyncMock(return_value={
-        "renewed": [{"mednr": "111", "verlaengert": False, "grund": "Keine Fristverlängerung! Nicht innerhalb der nächsten 10 Tage fällig!"}],
+        "renewed": [{"media_id": "111", "renewed": False, "reason": "Keine Fristverlängerung! Nicht innerhalb der nächsten 10 Tage fällig!"}],
         "list": list(LOANS),
     })
     _, _ = await _setup(hass, renew=renew)

@@ -66,10 +66,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             # renew() already fetched the fresh loan list — reuse it instead of
             # triggering a second full login + scrape.
             coordinator.async_set_updated_data(result["list"])
-            failed = [r for r in result["renewed"] if not r["verlaengert"]]
+            failed = [r for r in result["renewed"] if not r["renewed"]]
             if failed:
                 reasons = "; ".join(
-                    f"{r['mednr']}: {r['grund']}" if r["grund"] else r["mednr"]
+                    f"{r['media_id']}: {r['reason']}" if r["reason"] else r["media_id"]
                     for r in failed
                 )
                 raise HomeAssistantError(f"Renewal failed: {reasons}")

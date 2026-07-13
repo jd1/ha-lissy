@@ -154,17 +154,17 @@ def test_parse_rows_skips_short_rows():
 def test_parse_rows_parses_loans():
     rows = LissyClient._parse_rows(LOANS_HTML)
     assert len(rows) == 2
-    assert rows[0]["mednr"] == "12345678"
-    assert rows[0]["medientyp"] == "Buch"
-    assert rows[0]["kurztitel"] == "Ein Buchtitel"
-    assert rows[0]["leihfrist"] == "30.06.2026"
-    assert rows[1]["medientyp"] == "DVD"
+    assert rows[0]["media_id"] == "12345678"
+    assert rows[0]["media_type"] == "book"
+    assert rows[0]["title"] == "Ein Buchtitel"
+    assert rows[0]["due_date"] == "30.06.2026"
+    assert rows[1]["media_type"] == "dvd"
 
 
 def test_parse_rows_unknown_media_type():
     html = LOANS_HTML.replace("buch.gif", "unbekannt.gif")
     rows = LissyClient._parse_rows(html)
-    assert rows[0]["medientyp"] == "unbekannt"
+    assert rows[0]["media_type"] == "unknown"
 
 
 # ---------------------------------------------------------------------------
@@ -266,8 +266,8 @@ async def test_list_loans():
         loans = await client.list_loans()
 
     assert len(loans) == 2
-    assert loans[0]["mednr"] == "12345678"
-    assert loans[1]["mednr"] == "87654321"
+    assert loans[0]["media_id"] == "12345678"
+    assert loans[1]["media_id"] == "87654321"
 
 
 # ---------------------------------------------------------------------------
@@ -294,8 +294,8 @@ async def test_renew_all():
         result = await client.renew()
 
     assert len(result["renewed"]) == 1
-    assert result["renewed"][0]["mednr"] == "12345678"
-    assert result["renewed"][0]["verlaengert"] is True
+    assert result["renewed"][0]["media_id"] == "12345678"
+    assert result["renewed"][0]["renewed"] is True
     assert len(result["list"]) == 2
 
 

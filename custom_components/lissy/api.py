@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 import re
 from datetime import date
-from typing import Any
+from enum import StrEnum
+from typing import Any, TypedDict
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -15,13 +16,39 @@ _LOGGER = logging.getLogger(__name__)
 DEFAULT_BASE_URL = "https://stb.schwaebisch-gmuend.de/lissy/lissy.ly"
 _TIMEOUT = aiohttp.ClientTimeout(total=30)
 
-_MEDIA_TYPE_MAP = {
-    "buch": "Buch",
-    "zeitsc": "Zeitschrift",
-    "spiel": "Spiel/Puzzle",
-    "cd": "CD",
-    "dvd": "DVD",
-    "hörbuch": "Hörbuch",
+
+class MediaType(StrEnum):
+    BOOK = "book"
+    MAGAZINE = "magazine"
+    GAME = "game"
+    CD = "cd"
+    DVD = "dvd"
+    AUDIOBOOK = "audiobook"
+    UNKNOWN = "unknown"
+
+
+class LoanItem(TypedDict):
+    media_id: str
+    media_type: MediaType
+    title: str
+    due_date: str
+    note: str
+
+
+class RenewResult(TypedDict):
+    media_id: str
+    due_date: str
+    renewed: bool
+    reason: str
+
+
+_MEDIA_TYPE_MAP: dict[str, MediaType] = {
+    "buch": MediaType.BOOK,
+    "zeitsc": MediaType.MAGAZINE,
+    "spiel": MediaType.GAME,
+    "cd": MediaType.CD,
+    "dvd": MediaType.DVD,
+    "hörbuch": MediaType.AUDIOBOOK,
 }
 
 _HEADERS = {
@@ -142,7 +169,7 @@ class LissyClient:
         return text
 
     @staticmethod
-    def _parse_rows(html: str) -> list[dict[str, Any]]:
+    def _parse_rows(html: str) -> list[LoanItem]:
         soup = BeautifulSoup(html, "html.parser")
         table = soup.find("table")
         if not table:
@@ -156,13 +183,15 @@ class LissyClient:
                 cells[1].find("img").get("src", "") if cells[1].find("img") else ""
             )
             raw_type = img_src.split("/")[-1].replace(".gif", "").lower()
+            if raw_type not in _MEDIA_TYPE_MAP and raw_type:
+                _LOGGER.error("Unknown media type %r — mapped to UNKNOWN", raw_type)
             rows.append(
                 {
-                    "mednr": cells[2].get_text(strip=True).replace("​", ""),
-                    "medientyp": _MEDIA_TYPE_MAP.get(raw_type, raw_type),
-                    "kurztitel": cells[3].get_text(strip=True).replace("​", ""),
-                    "leihfrist": cells[4].get_text(strip=True).replace("​", ""),
-                    "hinweis": cells[5].get_text(strip=True).replace("​", ""),
+                    "media_id": cells[2].get_text(strip=True).replace("​", ""),
+                    "media_type": _MEDIA_TYPE_MAP.get(raw_type, MediaType.UNKNOWN),
+                    "title": cells[3].get_text(strip=True).replace("​", ""),
+                    "due_date": cells[4].get_text(strip=True).replace("​", ""),
+                    "note": cells[5].get_text(strip=True).replace("​", ""),
                 }
             )
         return rows
@@ -178,13 +207,13 @@ class LissyClient:
                 result.append({"name": name, "value": inp["value"]})
         return result
 
-    async def list_loans(self) -> list[dict[str, Any]]:
+    async def list_loans(self) -> list[LoanItem]:
         async with self._new_session() as session:
             c = await self._login(session)
             html = await self._entl_html(session, c)
         return self._parse_rows(html)
 
-    async def renew(self, targets: set[str] | None = None) -> dict[str, Any]:
+    async def renew(self, targets: set[str] | None = None) -> dict[str, list[LoanItem] | list[RenewResult]]:
         """Renew loans. ``targets`` = mednrs to renew, or None for all."""
         async with self._new_session() as session:
             c = await self._login(session)
@@ -225,7 +254,7 @@ class LissyClient:
             table = soup.find("table")
             if not table:
                 renewed = [
-                    {"mednr": m["value"], "verlaengert": "unknown"} for m in to_renew
+                    {"media_id": m["value"], "renewed": False, "reason": "no response table"} for m in to_renew
                 ]
             else:
                 renewed = []
@@ -235,10 +264,10 @@ class LissyClient:
                         continue
                     renewed.append(
                         {
-                            "mednr": cells[0].get_text(strip=True),
-                            "leihfrist": cells[2].get_text(strip=True),
-                            "verlaengert": cells[3].get_text(strip=True) == "Ja",
-                            "grund": (
+                            "media_id": cells[0].get_text(strip=True),
+                            "due_date": cells[2].get_text(strip=True),
+                            "renewed": cells[3].get_text(strip=True) == "Ja",
+                            "reason": (
                                 cells[4].get_text(strip=True) if len(cells) > 4 else ""
                             ),
                         }
