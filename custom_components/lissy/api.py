@@ -237,7 +237,7 @@ class LissyClient:
                         {
                             "mednr": cells[0].get_text(strip=True),
                             "leihfrist": cells[2].get_text(strip=True),
-                            "verlaengert": cells[3].get_text(strip=True),
+                            "verlaengert": cells[3].get_text(strip=True) == "Ja",
                             "grund": (
                                 cells[4].get_text(strip=True) if len(cells) > 4 else ""
                             ),

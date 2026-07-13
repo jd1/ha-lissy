@@ -295,7 +295,7 @@ async def test_renew_all():
 
     assert len(result["renewed"]) == 1
     assert result["renewed"][0]["mednr"] == "12345678"
-    assert result["renewed"][0]["verlaengert"] == "Ja"
+    assert result["renewed"][0]["verlaengert"] is True
     assert len(result["list"]) == 2
 
 

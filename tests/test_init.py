@@ -100,7 +100,7 @@ async def test_renew_multiple_items_same_account(hass):
 
 async def test_renew_does_not_trigger_second_fetch(hass):
     """H2: renew reuses the returned list; no extra list_loans call."""
-    renew = AsyncMock(return_value={"renewed": [{"mednr": "111"}], "list": [LOANS[1]]})
+    renew = AsyncMock(return_value={"renewed": [{"mednr": "111", "verlaengert": True, "grund": ""}], "list": [LOANS[1]]})
     _, client = await _setup(hass, renew=renew)
     calls_before = client.list_loans.await_count
 
@@ -152,6 +152,23 @@ async def test_renew_unknown_mednr_is_validation_error(hass):
     _, _ = await _setup(hass, renew=renew)
 
     with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            "renew",
+            {"entity_id": "sensor.lissy_12345_book_one"},
+            blocking=True,
+        )
+
+
+async def test_renew_failure_surfaces_as_error(hass):
+    """A Nein response from the library raises HomeAssistantError with the reason."""
+    renew = AsyncMock(return_value={
+        "renewed": [{"mednr": "111", "verlaengert": False, "grund": "Keine Fristverlängerung! Nicht innerhalb der nächsten 10 Tage fällig!"}],
+        "list": list(LOANS),
+    })
+    _, _ = await _setup(hass, renew=renew)
+
+    with pytest.raises(HomeAssistantError, match="Keine Fristverlängerung"):
         await hass.services.async_call(
             DOMAIN,
             "renew",
