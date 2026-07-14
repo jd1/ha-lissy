@@ -1,0 +1,114 @@
+blueprint:
+  name: Lissy — Auto-renew loans
+  description: >
+    Automatically renew library loans that are due within a configurable number
+    of days. Runs once a day at a chosen time and renews only the items that are
+    actually due soon, not the entire account.
+  domain: automation
+  input:
+    lissy_device:
+      name: Lissy account (device)
+      description: The Lissy library account to renew loans for.
+      selector:
+        device:
+          integration: lissy
+    days_before_due:
+      name: Days before due
+      description: Renew when an item is due within this many days.
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 30
+          unit_of_measurement: days
+    trigger_time:
+      name: Daily trigger time
+      description: Time of day to check and renew.
+      default: "09:00:00"
+      selector:
+        time:
+    notify_on_failure:
+      name: Notify on failure
+      description: Send a notification if renewal fails.
+      default: false
+      selector:
+        boolean:
+    notify_on_success:
+      name: Notify on success
+      description: Send a notification listing which items were renewed.
+      default: false
+      selector:
+        boolean:
+    notify_target:
+      name: Notification service
+      description: Notification service to use (e.g. notify.mobile_app_my_phone). Used when success or failure notifications are enabled.
+      default: notify.notify
+      selector:
+        text:
+
+variables:
+  lissy_device: !input lissy_device
+  days_before_due: !input days_before_due
+  notify_on_failure: !input notify_on_failure
+  notify_on_success: !input notify_on_success
+  notify_target: !input notify_target
+  # Snapshot of due-soon items and their days_until_due at trigger time (before
+  # the renewal). Success/failure is judged by whether each item's due date
+  # later moves OUT, which is robust for any days_before_due value.
+  due_soon_before: >
+    {% set ns = namespace(items=[]) %}
+    {% for s in states.sensor %}
+      {% if device_id(s.entity_id) == lissy_device
+            and s.attributes.get('media_type') is not none
+            and s.attributes.get('days_until_due') is not none
+            and s.attributes.days_until_due | int(99) <= days_before_due %}
+        {% set ns.items = ns.items + [{'entity_id': s.entity_id, 'days': s.attributes.days_until_due | int(99)}] %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.items }}
+  due_soon_entities: "{{ due_soon_before | map(attribute='entity_id') | list }}"
+
+trigger:
+  - platform: time
+    at: !input trigger_time
+
+condition:
+  - condition: template
+    value_template: "{{ due_soon_entities | length > 0 }}"
+
+action:
+  - continue_on_error: true
+    action: lissy.renew
+    target:
+      entity_id: "{{ due_soon_entities }}"
+  # An item was renewed iff its due date moved further out than before the
+  # attempt. Comparing against the snapshot works regardless of how far the
+  # renewal extends or how large days_before_due is.
+  - variables:
+      renewed_entities: >
+        {% set ns = namespace(result=[]) %}
+        {% for i in due_soon_before %}
+          {% set now = state_attr(i.entity_id, 'days_until_due') %}
+          {% if now is not none and now | int(-99) > i.days %}
+            {% set ns.result = ns.result + [i.entity_id] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.result }}
+      failed_entities: "{{ due_soon_entities | reject('in', renewed_entities) | list }}"
+  - if:
+      - condition: template
+        value_template: "{{ notify_on_failure and (failed_entities | length > 0) }}"
+    then:
+      - action: "{{ notify_target }}"
+        data:
+          title: "Lissy renewal failed"
+          message: "One or more loans could not be renewed automatically. Check Home Assistant logs for details."
+  - if:
+      - condition: template
+        value_template: "{{ notify_on_success and (renewed_entities | length > 0) }}"
+    then:
+      - action: "{{ notify_target }}"
+        data:
+          title: "Lissy loans renewed"
+          message: >
+            Renewed: {{ renewed_entities | map('state_attr', 'friendly_name') | select | join(', ') }}

@@ -42,3 +42,9 @@ Renews borrowed items.
 |---|---|
 | Lissy device | Renews all loans for that account |
 | Item sensor entity | Renews that specific item only |
+
+## Automatic renewal
+
+Copy `blueprints/automation/lissy_auto_renew.yaml` from this repository into your HA `config/blueprints/automation/` folder, then go to **Settings → Automations → Blueprints** and create an automation from **Lissy — Auto-renew loans**.
+
+The blueprint runs daily at a configurable time and calls `lissy.renew` only when at least one item is due within the configured number of days (default: 3). It uses the `days_until_due` attribute exposed by each item sensor.
