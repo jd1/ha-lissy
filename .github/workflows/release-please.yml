@@ -1,0 +1,32 @@
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          release-type: simple
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v4
+
+      - if: ${{ steps.release.outputs.release_created }}
+        name: Build zip
+        run: |
+          cd custom_components/lissy
+          zip -r ../../lissy-${{ steps.release.outputs.tag_name }}.zip .
+
+      - if: ${{ steps.release.outputs.release_created }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag_name }}
+          files: lissy-${{ steps.release.outputs.tag_name }}.zip
