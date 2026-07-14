@@ -263,9 +263,11 @@ class LissyClient:
             soup = BeautifulSoup(text, "html.parser")
             table = soup.find("table")
             if not table:
-                _LOGGER.warning("Renewal response had no result table; assuming success")
+                _LOGGER.warning("Renewal response had no result table")
+                _LOGGER.debug("Tableless renewal response HTML: %s", text[:5000])
                 renewed = [
-                    {"media_id": m["value"], "renewed": True, "reason": ""} for m in to_renew
+                    {"media_id": m["value"], "renewed": False, "reason": "no response table"}
+                    for m in to_renew
                 ]
             else:
                 renewed = []

@@ -348,6 +348,27 @@ async def test_renew_no_media_returns_empty():
 
 
 @pytest.mark.asyncio
+async def test_renew_no_result_table_reports_failure():
+    """Tableless renewal response is reported as failure, not silent success."""
+    client = LissyClient("user123", "pass456")
+    mock_session = _make_session(
+        _mock_response(LOGIN_PAGE_HTML),
+        _mock_response(POST_LOGIN_HTML),
+        _mock_response(TOPFRAME_HTML),
+        _mock_response(CHECKBOXES_HTML + LOANS_HTML),
+        _mock_response("<html><body>no table here</body></html>"),
+        _mock_response(TOPFRAME_HTML),
+        _mock_response(LOANS_HTML),
+    )
+    with patch.object(client, "_new_session", return_value=mock_session):
+        result = await client.renew()
+
+    assert result["renewed"]
+    assert all(r["renewed"] is False for r in result["renewed"])
+    assert all(r["reason"] == "no response table" for r in result["renewed"])
+
+
+@pytest.mark.asyncio
 async def test_renew_multiple_targets_posts_all():
     """H1: targeting several mednrs renews all of them in one login."""
     client = LissyClient("user123", "pass456")
