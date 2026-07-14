@@ -119,11 +119,12 @@ class LissyNextDueSensor(_LissyBase):
         earliest = self._earliest()
         if not earliest:
             return {}
-        _, item = earliest
+        due, item = earliest
         return {
             "media_id": item["media_id"],
             "title": item["title"],
             "type": item["media_type"],
+            "days_until_due": (due - date.today()).days,
         }
 
 
@@ -160,10 +161,12 @@ class LissyItemSensor(_LissyBase):
     def extra_state_attributes(self) -> dict[str, Any]:
         if not (item := self._item()):
             return {}
+        due = parse_leihfrist(item["due_date"])
         return {
             "media_id": item["media_id"],
             "media_type": item["media_type"],
             "note": item["note"],
+            "days_until_due": (due - date.today()).days if due else None,
         }
 
 

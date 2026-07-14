@@ -61,6 +61,22 @@ async def test_setup_creates_entities(hass):
     assert hass.states.get("calendar.lissy_12345") is not None
 
 
+async def test_item_sensor_days_until_due(hass):
+    """days_until_due attribute is an integer computed from due_date."""
+    await _setup(hass)
+    state = hass.states.get("sensor.lissy_12345_book_one")
+    days = state.attributes.get("days_until_due")
+    assert isinstance(days, int)
+
+
+async def test_next_due_sensor_days_until_due(hass):
+    """LissyNextDueSensor also exposes days_until_due for the earliest item."""
+    await _setup(hass)
+    state = hass.states.get("sensor.lissy_12345_next_due")
+    days = state.attributes.get("days_until_due")
+    assert isinstance(days, int)
+
+
 async def test_renew_all_via_device(hass):
     """Targeting the Lissy device renews all loans (targets=None)."""
     from homeassistant.helpers import device_registry as dev_reg_helper
