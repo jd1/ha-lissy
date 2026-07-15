@@ -84,7 +84,7 @@ async def test_reauth_flow_updates_password(hass):
 
     with _patch_client():
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"username": "12345", "password": "newpin"}
+            result["flow_id"], {"password": "newpin"}
         )
 
     assert result["type"] == FlowResultType.ABORT
@@ -101,7 +101,7 @@ async def test_reauth_flow_invalid_auth(hass):
     result = await entry.start_reauth_flow(hass)
     with _patch_client(list_loans=AsyncMock(side_effect=LissyAuthError)):
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"username": "12345", "password": "wrong"}
+            result["flow_id"], {"password": "wrong"}
         )
 
     assert result["type"] == FlowResultType.FORM

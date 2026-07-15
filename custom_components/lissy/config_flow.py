@@ -8,6 +8,11 @@ from typing import Any
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.helpers.selector import (
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .api import DEFAULT_BASE_URL, LissyAuthError, LissyClient, LissyConnectionError
 from .const import DOMAIN
@@ -16,7 +21,9 @@ STEP_SCHEMA = vol.Schema(
     {
         vol.Required("username"): str,
         vol.Required("password"): str,
-        vol.Optional("base_url", default=DEFAULT_BASE_URL): str,
+        vol.Optional("base_url", default=DEFAULT_BASE_URL): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.URL)
+        ),
     }
 )
 
@@ -43,6 +50,7 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
+            user_input["username"] = user_input["username"].strip()
             error = await _validate(user_input)
             if error:
                 errors["base"] = error
@@ -67,20 +75,17 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         reauth_entry = self._get_reauth_entry()
         if user_input is not None:
-            merged = {**reauth_entry.data, **user_input}
+            merged = {**reauth_entry.data, "password": user_input["password"]}
             error = await _validate(merged)
             if error:
                 errors["base"] = error
             else:
+                await self.async_set_unique_id(reauth_entry.unique_id)
+                self._abort_if_unique_id_mismatch()
                 return self.async_update_reload_and_abort(reauth_entry, data=merged)
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema(
-                {
-                    vol.Required("username"): str,
-                    vol.Required("password"): str,
-                }
-            ),
+            data_schema=vol.Schema({vol.Required("password"): str}),
             errors=errors,
         )
