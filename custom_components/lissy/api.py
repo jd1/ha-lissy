@@ -91,11 +91,16 @@ class LissyConnectionError(Exception):
 
 class LissyClient:
     def __init__(
-        self, username: str, password: str, base_url: str = DEFAULT_BASE_URL
+        self,
+        username: str,
+        password: str,
+        base_url: str = DEFAULT_BASE_URL,
+        session: aiohttp.ClientSession | None = None,
     ) -> None:
         self._username = username
         self._password = password
         self._base_url = base_url
+        self._shared_session = session
 
     def _new_session(self) -> aiohttp.ClientSession:
         return aiohttp.ClientSession(headers=_HEADERS, timeout=_TIMEOUT)
@@ -223,15 +228,28 @@ class LissyClient:
                 result.append({"name": name, "value": inp["value"]})
         return result
 
+    async def _get_session(self):
+        """Return a context manager yielding an aiohttp session."""
+        if self._shared_session is not None:
+            # Shared session must not be closed — wrap in a no-op CM.
+            from contextlib import asynccontextmanager
+
+            @asynccontextmanager
+            async def _noop():
+                yield self._shared_session
+
+            return _noop()
+        return self._new_session()
+
     async def list_loans(self) -> list[LoanItem]:
-        async with self._new_session() as session:
+        async with await self._get_session() as session:
             c = await self._login(session)
             html = await self._entl_html(session, c)
         return self._parse_rows(html)
 
     async def renew(self, targets: set[str] | None = None) -> RenewResponse:
         """Renew loans. ``targets`` = mednrs to renew, or None for all."""
-        async with self._new_session() as session:
+        async with await self._get_session() as session:
             c = await self._login(session)
             html = await self._entl_html(session, c)
             all_media = self._parse_checkboxes(html)

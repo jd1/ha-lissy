@@ -7,6 +7,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import LissyAuthError, LissyClient, LissyConnectionError
 from .const import DOMAIN, ITEM_ID_SEP
@@ -93,6 +94,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data["username"],
         entry.data["password"],
         entry.data.get("base_url"),
+        session=async_get_clientsession(hass),
     )
     coordinator = LissyCoordinator(hass, client, entry)
     await coordinator.async_config_entry_first_refresh()
