@@ -18,6 +18,8 @@ from .api import LoanItem, MediaType, parse_leihfrist
 from .const import DOMAIN, ITEM_ID_SEP
 from .coordinator import LissyCoordinator
 
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback

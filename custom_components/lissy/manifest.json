@@ -6,8 +6,10 @@
   ],
   "config_flow": true,
   "documentation": "https://github.com/jd1/ha-lissy",
+  "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/jd1/ha-lissy/issues",
+  "loggers": ["custom_components.lissy"],
   "requirements": [
     "beautifulsoup4==4.15.0"
   ],
