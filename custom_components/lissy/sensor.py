@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
@@ -97,6 +97,7 @@ class LissyCountSensor(_LissyBase):
 class LissyNextDueSensor(_LissyBase):
     _attr_icon = "mdi:calendar-clock"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.DATE
 
     def __init__(self, coordinator: LissyCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator, entry)
@@ -112,9 +113,9 @@ class LissyNextDueSensor(_LissyBase):
         return min(dated, key=lambda x: x[0]) if dated else None
 
     @property
-    def native_value(self) -> str | None:
+    def native_value(self) -> date | None:
         earliest = self._earliest()
-        return earliest[0].isoformat() if earliest else None
+        return earliest[0] if earliest else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -132,6 +133,8 @@ class LissyNextDueSensor(_LissyBase):
 
 class LissyItemSensor(_LissyBase):
     """One sensor per borrowed item. State = due date, available = still on loan."""
+
+    _attr_device_class = SensorDeviceClass.DATE
 
     def __init__(
         self, coordinator: LissyCoordinator, entry: ConfigEntry, item: LoanItem
@@ -157,11 +160,10 @@ class LissyItemSensor(_LissyBase):
         return self._item() is not None
 
     @property
-    def native_value(self) -> str | None:
+    def native_value(self) -> date | None:
         if not (item := self._item()):
             return None
-        d = parse_leihfrist(item["due_date"])
-        return d.isoformat() if d else item["due_date"]
+        return parse_leihfrist(item["due_date"])
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
