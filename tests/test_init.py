@@ -116,7 +116,12 @@ async def test_renew_multiple_items_same_account(hass):
 
 async def test_renew_does_not_trigger_second_fetch(hass):
     """H2: renew reuses the returned list; no extra list_loans call."""
-    renew = AsyncMock(return_value={"renewed": [{"media_id": "111", "renewed": True, "reason": ""}], "list": [LOANS[1]]})
+    renew = AsyncMock(
+        return_value={
+            "renewed": [{"media_id": "111", "renewed": True, "reason": ""}],
+            "list": [LOANS[1]],
+        }
+    )
     _, client = await _setup(hass, renew=renew)
     calls_before = client.list_loans.await_count
 
@@ -178,10 +183,18 @@ async def test_renew_unknown_mednr_is_validation_error(hass):
 
 async def test_renew_failure_surfaces_as_error(hass):
     """A Nein response from the library raises HomeAssistantError with the reason."""
-    renew = AsyncMock(return_value={
-        "renewed": [{"media_id": "111", "renewed": False, "reason": "Keine Fristverlängerung! Nicht innerhalb der nächsten 10 Tage fällig!"}],
-        "list": list(LOANS),
-    })
+    renew = AsyncMock(
+        return_value={
+            "renewed": [
+                {
+                    "media_id": "111",
+                    "renewed": False,
+                    "reason": "Keine Fristverlängerung! Nicht innerhalb der nächsten 10 Tage fällig!",
+                }
+            ],
+            "list": list(LOANS),
+        }
+    )
     _, _ = await _setup(hass, renew=renew)
 
     with pytest.raises(HomeAssistantError, match="Keine Fristverlängerung"):
@@ -191,6 +204,18 @@ async def test_renew_failure_surfaces_as_error(hass):
             {"entity_id": "sensor.lissy_12345_book_one"},
             blocking=True,
         )
+
+
+async def test_unload_entry(hass):
+    """Unloading an entry tears down platforms and drops the coordinator."""
+    entry, _ = await _setup(hass)
+    assert entry.entry_id in hass.data[DOMAIN]
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.entry_id not in hass.data[DOMAIN]
+    assert hass.states.get("sensor.lissy_12345_borrowed").state == "unavailable"
 
 
 async def test_returned_book_entity_is_removed(hass):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from datetime import date
@@ -104,7 +105,7 @@ class LissyClient:
             async with session.get(self._base_url, params={"pg": "bnrlogin"}) as r:
                 r.raise_for_status()
                 text = await r.text(encoding="latin-1")
-        except aiohttp.ClientError as e:
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             raise LissyConnectionError(str(e)) from e
 
         try:
@@ -131,7 +132,7 @@ class LissyClient:
             ) as r2:
                 r2.raise_for_status()
                 text2 = await r2.text(encoding="latin-1")
-        except aiohttp.ClientError as e:
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             raise LissyConnectionError(str(e)) from e
 
         match = re.search(r"[?&]c=([a-z0-9]+)", text2, re.IGNORECASE)
@@ -143,39 +144,44 @@ class LissyClient:
         return match.group(1)
 
     async def _entl_html(self, session: aiohttp.ClientSession, c: str) -> str:
-        async with session.get(
-            self._base_url,
-            params={
-                "pg": "getpage",
-                "type": "topframe",
-                "pgaction": "noframegen",
-                "c": c,
-            },
-        ) as r:
-            r.raise_for_status()
-            top_text = await r.text(encoding="latin-1")
+        try:
+            async with session.get(
+                self._base_url,
+                params={
+                    "pg": "getpage",
+                    "type": "topframe",
+                    "pgaction": "noframegen",
+                    "c": c,
+                },
+            ) as r:
+                r.raise_for_status()
+                top_text = await r.text(encoding="latin-1")
 
-        pgnr_match = re.search(r"pgnr=([A-Z0-9]+)", top_text)
-        pgnr = pgnr_match.group(1) if pgnr_match else ""
+            pgnr_match = re.search(r"pgnr=([A-Z0-9]+)", top_text)
+            pgnr = pgnr_match.group(1) if pgnr_match else ""
 
-        async with session.get(
-            self._base_url,
-            params={
-                "pg": "anzeige",
-                "type": "entl",
-                "c": c,
-                "pgnr": pgnr,
-            },
-        ) as r:
-            r.raise_for_status()
-            text = await r.text(encoding="latin-1")
-
-        redirect = re.search(r"window\.location\.replace\(['\"]([^'\"]+)['\"]", text)
-        if redirect:
-            host = self._base_url.split("/lissy/")[0]
-            async with session.get(host + redirect.group(1)) as r:
+            async with session.get(
+                self._base_url,
+                params={
+                    "pg": "anzeige",
+                    "type": "entl",
+                    "c": c,
+                    "pgnr": pgnr,
+                },
+            ) as r:
                 r.raise_for_status()
                 text = await r.text(encoding="latin-1")
+
+            redirect = re.search(
+                r"window\.location\.replace\(['\"]([^'\"]+)['\"]", text
+            )
+            if redirect:
+                host = self._base_url.split("/lissy/")[0]
+                async with session.get(host + redirect.group(1)) as r:
+                    r.raise_for_status()
+                    text = await r.text(encoding="latin-1")
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            raise LissyConnectionError(str(e)) from e
         return text
 
     @staticmethod
@@ -247,18 +253,21 @@ class LissyClient:
             for m in to_renew:
                 data[m["name"]] = m["value"]
 
-            async with session.post(self._base_url, data=data) as r:
-                r.raise_for_status()
-                text = await r.text(encoding="latin-1")
-
-            frameset = BeautifulSoup(text, "html.parser")
-            right_frame = frameset.find("frame", attrs={"name": "toprightframe"})
-            if right_frame:
-                host = self._base_url.split("/lissy/")[0]
-                frame_url = host + right_frame["src"].replace("??&&", "?")
-                async with session.get(frame_url) as r:
+            try:
+                async with session.post(self._base_url, data=data) as r:
                     r.raise_for_status()
                     text = await r.text(encoding="latin-1")
+
+                frameset = BeautifulSoup(text, "html.parser")
+                right_frame = frameset.find("frame", attrs={"name": "toprightframe"})
+                if right_frame:
+                    host = self._base_url.split("/lissy/")[0]
+                    frame_url = host + right_frame["src"].replace("??&&", "?")
+                    async with session.get(frame_url) as r:
+                        r.raise_for_status()
+                        text = await r.text(encoding="latin-1")
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                raise LissyConnectionError(str(e)) from e
 
             soup = BeautifulSoup(text, "html.parser")
             table = soup.find("table")
@@ -266,7 +275,11 @@ class LissyClient:
                 _LOGGER.warning("Renewal response had no result table")
                 _LOGGER.debug("Tableless renewal response HTML: %s", text[:5000])
                 renewed = [
-                    {"media_id": m["value"], "renewed": False, "reason": "no response table"}
+                    {
+                        "media_id": m["value"],
+                        "renewed": False,
+                        "reason": "no response table",
+                    }
                     for m in to_renew
                 ]
             else:
@@ -277,11 +290,13 @@ class LissyClient:
                         continue
                     renewed.append(
                         {
-                            "media_id": cells[0].get_text(strip=True),
-                            "due_date": cells[2].get_text(strip=True),
+                            "media_id": cells[0].get_text(strip=True).replace("​", ""),
+                            "due_date": cells[2].get_text(strip=True).replace("​", ""),
                             "renewed": cells[3].get_text(strip=True) == "Ja",
                             "reason": (
-                                cells[4].get_text(strip=True) if len(cells) > 4 else ""
+                                cells[4].get_text(strip=True).replace("​", "")
+                                if len(cells) > 4
+                                else ""
                             ),
                         }
                     )

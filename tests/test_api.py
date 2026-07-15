@@ -62,6 +62,22 @@ LOANS_HTML = """
     <td>15.07.2026</td>
     <td>Verlängerung möglich</td>
   </tr>
+  <tr>
+    <td>3</td>
+    <td><img src="/images/spiel.gif"/></td>
+    <td>111111</td>
+    <td>Ein Spiel-Titel</td>
+    <td>16.07.2026</td>
+    <td>Verlängerung möglich</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td><img src="/images/zeitsc.gif"/></td>
+    <td>222222</td>
+    <td>Ein Zeitschrift-Titel</td>
+    <td>17.07.2026</td>
+    <td>Verlängerung möglich</td>
+  </tr>
 </table>
 </body></html>
 """
@@ -153,13 +169,26 @@ def test_parse_rows_skips_short_rows():
 
 def test_parse_rows_parses_loans():
     rows = LissyClient._parse_rows(LOANS_HTML)
-    assert len(rows) == 2
+    assert len(rows) == 4
     assert rows[0]["media_id"] == "12345678"
     assert rows[0]["media_type"] == "book"
     assert rows[0]["title"] == "Ein Buchtitel"
     assert rows[0]["due_date"] == "30.06.2026"
-    assert rows[1]["media_type"] == "dvd"
 
+    assert rows[1]["media_id"] == "87654321"
+    assert rows[1]["media_type"] == "dvd"
+    assert rows[1]["title"] == "Ein DVD-Titel"
+    assert rows[1]["due_date"] == "15.07.2026"
+
+    assert rows[2]["media_id"] == "111111"
+    assert rows[2]["media_type"] == "game"
+    assert rows[2]["title"] == "Ein Spiel-Titel"
+    assert rows[2]["due_date"] == "16.07.2026"
+
+    assert rows[3]["media_id"] == "222222"
+    assert rows[3]["media_type"] == "magazine"
+    assert rows[3]["title"] == "Ein Zeitschrift-Titel"
+    assert rows[3]["due_date"] == "17.07.2026"
 
 def test_parse_rows_unknown_media_type():
     html = LOANS_HTML.replace("buch.gif", "unbekannt.gif")
@@ -265,7 +294,7 @@ async def test_list_loans():
     with patch.object(client, "_new_session", return_value=mock_session):
         loans = await client.list_loans()
 
-    assert len(loans) == 2
+    assert len(loans) == 4
     assert loans[0]["media_id"] == "12345678"
     assert loans[1]["media_id"] == "87654321"
 
@@ -296,7 +325,7 @@ async def test_renew_all():
     assert len(result["renewed"]) == 1
     assert result["renewed"][0]["media_id"] == "12345678"
     assert result["renewed"][0]["renewed"] is True
-    assert len(result["list"]) == 2
+    assert len(result["list"]) == 4
 
 
 @pytest.mark.asyncio
