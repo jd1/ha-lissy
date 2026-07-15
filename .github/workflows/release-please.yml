@@ -13,7 +13,6 @@ jobs:
       - uses: googleapis/release-please-action@v5
         id: release
         with:
-          release-type: simple
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - if: ${{ steps.release.outputs.release_created }}
