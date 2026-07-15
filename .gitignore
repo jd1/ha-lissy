@@ -4,3 +4,12 @@
 .venv/
 __pycache__/
 .pytest_cache/
+ha-config/.cache
+ha-config/.storage/
+ha-config/home-assistant.log*
+ha-config/home-assistant_v2.db*
+ha-config/deps/
+ha-config/.ha_run.lock
+ha-config/tts/
+ha-config/tmp/
+ha-config/*.secret
