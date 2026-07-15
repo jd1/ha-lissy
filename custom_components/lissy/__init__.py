@@ -101,14 +101,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.runtime_data = coordinator
 
-    registry = dr.async_get(hass)
-    registry.async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, entry.entry_id)},
-        name=entry.title,
-        manufacturer="Lissy",
-    )
-
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
