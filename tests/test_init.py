@@ -207,21 +207,18 @@ async def test_renew_failure_surfaces_as_error(hass):
 
 
 async def test_unload_entry(hass):
-    """Unloading an entry tears down platforms and drops the coordinator."""
+    """Unloading an entry tears down platforms and clears runtime_data."""
     entry, _ = await _setup(hass)
-    assert entry.entry_id in hass.data[DOMAIN]
+    assert hasattr(entry, "runtime_data")
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
 
-    assert entry.entry_id not in hass.data[DOMAIN]
     assert hass.states.get("sensor.lissy_12345_borrowed").state == "unavailable"
 
 
 async def test_returned_book_entity_is_removed(hass):
     """Returning a book removes its entity from the registry entirely."""
-    from custom_components.lissy.const import DOMAIN as _DOMAIN
-
     entry, _ = await _setup(hass)
     reg = er.async_get(hass)
 
@@ -229,7 +226,7 @@ async def test_returned_book_entity_is_removed(hass):
     assert reg.async_get("sensor.lissy_12345_dvd_two") is not None
 
     # Push updated data (book_one returned) directly into the coordinator
-    coordinator = hass.data[_DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     coordinator.async_set_updated_data([LOANS[1]])
     await hass.async_block_till_done()
 

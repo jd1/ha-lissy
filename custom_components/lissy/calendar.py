@@ -22,7 +22,7 @@ PARALLEL_UPDATES = 0
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    coordinator: LissyCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: LissyCoordinator = entry.runtime_data
     async_add_entities([LissyCalendar(coordinator, entry)])
 
 

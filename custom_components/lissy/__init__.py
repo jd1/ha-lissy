@@ -12,6 +12,8 @@ from .api import LissyAuthError, LissyClient, LissyConnectionError
 from .const import DOMAIN, ITEM_ID_SEP
 from .coordinator import LissyCoordinator
 
+type LissyConfigEntry = ConfigEntry[LissyCoordinator]
+
 PLATFORMS = [Platform.SENSOR, Platform.CALENDAR]
 
 
@@ -34,7 +36,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             device = dev_reg.async_get(device_id)
             if device:
                 for ceid in device.config_entries:
-                    if ceid in hass.data.get(DOMAIN, {}):
+                    e = hass.config_entries.async_get_entry(ceid)
+                    if e and e.domain == DOMAIN and hasattr(e, "runtime_data"):
                         targets_by_entry[ceid] = None
 
         reg = er.async_get(hass)
@@ -55,10 +58,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                     f"{entity_id} is not a renewable item sensor"
                 )
 
+        cfg_entries = hass.config_entries
         for entry_id, targets in targets_by_entry.items():
-            coordinator = hass.data.get(DOMAIN, {}).get(entry_id)
-            if not coordinator:
+            cfg_entry = cfg_entries.async_get_entry(entry_id)
+            if not cfg_entry or not hasattr(cfg_entry, "runtime_data"):
                 continue
+            coordinator: LissyCoordinator = cfg_entry.runtime_data
             try:
                 result = await coordinator.client.renew(targets)
             except ValueError as e:
@@ -92,7 +97,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = LissyCoordinator(hass, client, entry)
     await coordinator.async_config_entry_first_refresh()
 
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
 
     registry = dr.async_get(hass)
     registry.async_get_or_create(
@@ -107,7 +112,4 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unloaded:
-        hass.data[DOMAIN].pop(entry.entry_id)
-    return unloaded
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
