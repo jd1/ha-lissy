@@ -20,7 +20,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         _target = getattr(call, "target", None) or {}
         raw = _target.get("entity_id") or call.data.get("entity_id")
         _raw_dev = _target.get("device_id") or call.data.get("device_id") or []
-        device_ids = [d for d in (_raw_dev if isinstance(_raw_dev, list) else [_raw_dev]) if d]
+        device_ids = [
+            d for d in (_raw_dev if isinstance(_raw_dev, list) else [_raw_dev]) if d
+        ]
         if not raw and not device_ids:
             raise ServiceValidationError("A target entity or device must be provided")
         target_entities = (raw if isinstance(raw, list) else [raw]) if raw else []

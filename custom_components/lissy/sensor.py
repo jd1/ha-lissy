@@ -47,7 +47,9 @@ async def async_setup_entry(
 
         for media_id in known - current:
             unique_id = f"{entry.entry_id}{ITEM_ID_SEP}{media_id}"
-            if entity_id := er_instance.async_get_entity_id("sensor", DOMAIN, unique_id):
+            if entity_id := er_instance.async_get_entity_id(
+                "sensor", DOMAIN, unique_id
+            ):
                 er_instance.async_remove(entity_id)
         known.intersection_update(current)
 
@@ -142,7 +144,11 @@ class LissyItemSensor(_LissyBase):
 
     def _item(self) -> LoanItem | None:
         return next(
-            (m for m in (self.coordinator.data or []) if m["media_id"] == self._media_id),
+            (
+                m
+                for m in (self.coordinator.data or [])
+                if m["media_id"] == self._media_id
+            ),
             None,
         )
 

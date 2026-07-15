@@ -190,6 +190,7 @@ def test_parse_rows_parses_loans():
     assert rows[3]["title"] == "Ein Zeitschrift-Titel"
     assert rows[3]["due_date"] == "17.07.2026"
 
+
 def test_parse_rows_unknown_media_type():
     html = LOANS_HTML.replace("buch.gif", "unbekannt.gif")
     rows = LissyClient._parse_rows(html)
