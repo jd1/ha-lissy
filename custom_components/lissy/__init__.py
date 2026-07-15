@@ -63,7 +63,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 result = await coordinator.client.renew(targets)
             except ValueError as e:
                 raise ServiceValidationError(str(e)) from e
-            except (LissyAuthError, LissyConnectionError) as e:
+            except LissyAuthError as e:
+                coordinator.config_entry.async_start_reauth(hass)
+                raise HomeAssistantError(f"Renew failed: {e}") from e
+            except LissyConnectionError as e:
                 raise HomeAssistantError(f"Renew failed: {e}") from e
             # renew() already fetched the fresh loan list — reuse it instead of
             # triggering a second full login + scrape.
@@ -86,7 +89,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data["password"],
         entry.data.get("base_url"),
     )
-    coordinator = LissyCoordinator(hass, client)
+    coordinator = LissyCoordinator(hass, client, entry)
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 import logging
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -16,12 +17,15 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class LissyCoordinator(DataUpdateCoordinator[list[LoanItem]]):
-    def __init__(self, hass: HomeAssistant, client: LissyClient) -> None:
+    def __init__(
+        self, hass: HomeAssistant, client: LissyClient, entry: ConfigEntry
+    ) -> None:
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
             update_interval=timedelta(hours=UPDATE_INTERVAL_HOURS),
+            config_entry=entry,
         )
         self.client = client
 
