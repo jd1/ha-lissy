@@ -60,6 +60,8 @@ async def async_setup_entry(
 
 
 class _LissyBase(CoordinatorEntity[LissyCoordinator], SensorEntity):
+    _attr_has_entity_name = True
+
     def __init__(self, coordinator: LissyCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
         self._entry = entry
@@ -80,7 +82,7 @@ class LissyCountSensor(_LissyBase):
     def __init__(self, coordinator: LissyCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator, entry)
         self._attr_unique_id = f"{entry.entry_id}_count"
-        self._attr_name = f"{entry.title} Borrowed"
+        self._attr_name = "Borrowed"
 
     @property
     def native_value(self) -> int:
@@ -104,7 +106,7 @@ class LissyNextDueSensor(_LissyBase):
     def __init__(self, coordinator: LissyCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator, entry)
         self._attr_unique_id = f"{entry.entry_id}_next_due"
-        self._attr_name = f"{entry.title} Next Due"
+        self._attr_name = "Next Due"
 
     def _earliest(self) -> tuple[date, dict[str, Any]] | None:
         dated = [
