@@ -8,6 +8,7 @@ import re
 from datetime import date
 from enum import StrEnum
 from typing import Any, NotRequired, TypedDict
+from urllib.parse import urljoin
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -81,6 +82,12 @@ def parse_leihfrist(value: str) -> date | None:
     return None
 
 
+def _redact_tokens(html: str) -> str:
+    """Redact session tokens from HTML before logging to prevent replay attacks."""
+    redacted = re.sub(r"([?&](c|mgcnum|bnrlgncke)=)[a-zA-Z0-9]+", r"\1[REDACTED]", html)
+    return redacted[:5000]
+
+
 class LissyAuthError(Exception):
     pass
 
@@ -120,7 +127,9 @@ class LissyClient:
                 r"[?&]bnrlgncke=([a-z0-9]+)", text, re.IGNORECASE
             ).group(1)
         except AttributeError as e:
-            _LOGGER.debug("Login page HTML (first 5000 chars): %s", text[:5000])
+            _LOGGER.debug(
+                "Login page HTML (first 5000 chars): %s", _redact_tokens(text)
+            )
             raise LissyConnectionError("Unexpected login page structure") from e
 
         try:
@@ -142,7 +151,7 @@ class LissyClient:
 
         match = re.search(r"[?&]c=([a-z0-9]+)", text2, re.IGNORECASE)
         if not match:
-            _LOGGER.debug("Post-login page HTML: %s", text2[:2000])
+            _LOGGER.debug("Post-login page HTML: %s", _redact_tokens(text2))
             raise LissyAuthError(
                 "Login failed — bad credentials or unexpected response"
             )
@@ -181,8 +190,7 @@ class LissyClient:
                 r"window\.location\.replace\(['\"]([^'\"]+)['\"]", text
             )
             if redirect:
-                host = self._base_url.split("/lissy/")[0]
-                async with session.get(host + redirect.group(1)) as r:
+                async with session.get(urljoin(self._base_url, redirect.group(1))) as r:
                     r.raise_for_status()
                     text = await r.text(encoding="latin-1")
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
@@ -192,7 +200,11 @@ class LissyClient:
     @staticmethod
     def _parse_rows(html: str) -> list[LoanItem]:
         soup = BeautifulSoup(html, "html.parser")
-        table = soup.find("table")
+        # Anchor to the first table that has a <th> header row (the loans table).
+        table = next(
+            (t for t in soup.find_all("table") if t.find("th")),
+            None,
+        )
         if not table:
             return []
         rows = []
@@ -279,8 +291,9 @@ class LissyClient:
                 frameset = BeautifulSoup(text, "html.parser")
                 right_frame = frameset.find("frame", attrs={"name": "toprightframe"})
                 if right_frame:
-                    host = self._base_url.split("/lissy/")[0]
-                    frame_url = host + right_frame["src"].replace("??&&", "?")
+                    frame_url = urljoin(
+                        self._base_url, right_frame["src"].replace("??&&", "?")
+                    )
                     async with session.get(frame_url) as r:
                         r.raise_for_status()
                         text = await r.text(encoding="latin-1")
@@ -288,10 +301,12 @@ class LissyClient:
                 raise LissyConnectionError(str(e)) from e
 
             soup = BeautifulSoup(text, "html.parser")
-            table = soup.find("table")
+            table = next((t for t in soup.find_all("table") if t.find("th")), None)
             if not table:
                 _LOGGER.warning("Renewal response had no result table")
-                _LOGGER.debug("Tableless renewal response HTML: %s", text[:5000])
+                _LOGGER.debug(
+                    "Tableless renewal response HTML: %s", _redact_tokens(text)
+                )
                 renewed = [
                     {
                         "media_id": m["value"],
