@@ -70,7 +70,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             except ValueError as e:
                 raise ServiceValidationError(str(e)) from e
             except LissyAuthError as e:
-                coordinator.config_entry.async_start_reauth(hass)
+                cfg_entry.async_start_reauth(hass)
                 raise HomeAssistantError(f"Renew failed: {e}") from e
             except LissyConnectionError as e:
                 raise HomeAssistantError(f"Renew failed: {e}") from e
@@ -90,10 +90,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    from .api import DEFAULT_BASE_URL
+
     client = LissyClient(
         entry.data["username"],
         entry.data["password"],
-        entry.data.get("base_url"),
+        entry.data.get("base_url", DEFAULT_BASE_URL),
         session=async_get_clientsession(hass),
     )
     coordinator = LissyCoordinator(hass, client, entry)

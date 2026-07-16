@@ -120,17 +120,17 @@ class LissyClient:
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             raise LissyConnectionError(str(e)) from e
 
-        try:
-            c = re.search(r"[?&]c=([a-z0-9]+)", text, re.IGNORECASE).group(1)
-            mgcnum = re.search(r"[?&]mgcnum=([A-Z0-9]+)", text, re.IGNORECASE).group(1)
-            bnrlgncke = re.search(
-                r"[?&]bnrlgncke=([a-z0-9]+)", text, re.IGNORECASE
-            ).group(1)
-        except AttributeError as e:
+        m_c = re.search(r"[?&]c=([a-z0-9]+)", text, re.IGNORECASE)
+        m_mgc = re.search(r"[?&]mgcnum=([A-Z0-9]+)", text, re.IGNORECASE)
+        m_bnr = re.search(r"[?&]bnrlgncke=([a-z0-9]+)", text, re.IGNORECASE)
+        if not (m_c and m_mgc and m_bnr):
             _LOGGER.debug(
                 "Login page HTML (first 5000 chars): %s", _redact_tokens(text)
             )
-            raise LissyConnectionError("Unexpected login page structure") from e
+            raise LissyConnectionError("Unexpected login page structure")
+        c = m_c.group(1)
+        mgcnum = m_mgc.group(1)
+        bnrlgncke = m_bnr.group(1)
 
         try:
             async with session.post(
@@ -212,20 +212,20 @@ class LissyClient:
             cells = tr.find_all("td")
             if len(cells) < 6:
                 continue
-            img_src = (
-                cells[1].find("img").get("src", "") if cells[1].find("img") else ""
-            )
+            img = cells[1].find("img")
+            img_src_raw = img.get("src", "") if img else ""
+            img_src = str(img_src_raw) if img_src_raw else ""
             raw_type = img_src.split("/")[-1].replace(".gif", "").lower()
             if raw_type not in _MEDIA_TYPE_MAP and raw_type:
                 _LOGGER.error("Unknown media type %r — mapped to UNKNOWN", raw_type)
             rows.append(
-                {
-                    "media_id": cells[2].get_text(strip=True).replace("​", ""),
-                    "media_type": _MEDIA_TYPE_MAP.get(raw_type, MediaType.UNKNOWN),
-                    "title": cells[3].get_text(strip=True).replace("​", ""),
-                    "due_date": cells[4].get_text(strip=True).replace("​", ""),
-                    "note": cells[5].get_text(strip=True).replace("​", ""),
-                }
+                LoanItem(
+                    media_id=cells[2].get_text(strip=True).replace("​", ""),
+                    media_type=_MEDIA_TYPE_MAP.get(raw_type, MediaType.UNKNOWN),
+                    title=cells[3].get_text(strip=True).replace("​", ""),
+                    due_date=cells[4].get_text(strip=True).replace("​", ""),
+                    note=cells[5].get_text(strip=True).replace("​", ""),
+                )
             )
         return rows
 
@@ -235,9 +235,10 @@ class LissyClient:
         seen, result = set(), []
         for inp in soup.find_all("input", attrs={"name": re.compile(r"^mednr\d+$")}):
             name = inp.get("name")
-            if name and inp.get("value") and name not in seen:
+            value = inp.get("value")
+            if name and value and name not in seen:
                 seen.add(name)
-                result.append({"name": name, "value": inp["value"]})
+                result.append(_CheckboxInput(name=str(name), value=str(value)))
         return result
 
     async def _get_session(self):
@@ -291,9 +292,8 @@ class LissyClient:
                 frameset = BeautifulSoup(text, "html.parser")
                 right_frame = frameset.find("frame", attrs={"name": "toprightframe"})
                 if right_frame:
-                    frame_url = urljoin(
-                        self._base_url, right_frame["src"].replace("??&&", "?")
-                    )
+                    raw_src = str(right_frame.get("src", ""))
+                    frame_url = urljoin(self._base_url, raw_src.replace("??&&", "?"))
                     async with session.get(frame_url) as r:
                         r.raise_for_status()
                         text = await r.text(encoding="latin-1")
@@ -307,12 +307,12 @@ class LissyClient:
                 _LOGGER.debug(
                     "Tableless renewal response HTML: %s", _redact_tokens(text)
                 )
-                renewed = [
-                    {
-                        "media_id": m["value"],
-                        "renewed": False,
-                        "reason": "no response table",
-                    }
+                renewed: list[RenewResult] = [
+                    RenewResult(
+                        media_id=m["value"],
+                        renewed=False,
+                        reason="no response table",
+                    )
                     for m in to_renew
                 ]
             else:
@@ -322,16 +322,16 @@ class LissyClient:
                     if len(cells) < 4:
                         continue
                     renewed.append(
-                        {
-                            "media_id": cells[0].get_text(strip=True).replace("​", ""),
-                            "due_date": cells[2].get_text(strip=True).replace("​", ""),
-                            "renewed": cells[3].get_text(strip=True) == "Ja",
-                            "reason": (
+                        RenewResult(
+                            media_id=cells[0].get_text(strip=True).replace("​", ""),
+                            due_date=cells[2].get_text(strip=True).replace("​", ""),
+                            renewed=cells[3].get_text(strip=True) == "Ja",
+                            reason=(
                                 cells[4].get_text(strip=True).replace("​", "")
                                 if len(cells) > 4
                                 else ""
                             ),
-                        }
+                        )
                     )
 
             updated_list = self._parse_rows(await self._entl_html(session, c))

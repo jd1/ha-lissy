@@ -2,5 +2,7 @@
 pytest
 pytest-asyncio
 pytest-homeassistant-custom-component
+pytest-cov
 black
 bandit
+mypy

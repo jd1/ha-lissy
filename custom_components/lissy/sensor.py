@@ -108,7 +108,7 @@ class LissyNextDueSensor(_LissyBase):
         self._attr_unique_id = f"{entry.entry_id}_next_due"
         self._attr_name = "Next Due"
 
-    def _earliest(self) -> tuple[date, dict[str, Any]] | None:
+    def _earliest(self) -> tuple[date, LoanItem] | None:
         dated = [
             (due_date, m)
             for m in (self.coordinator.data or [])
