@@ -31,18 +31,6 @@ jobs:
       - name: Run pytest
         run: pytest --cov=custom_components/lissy --cov-report=term-missing
 
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-          cache: pip
-
-      - name: Install dependencies
-        run: pip install -r requirements_test.txt
-
       - name: Run bandit
         run: bandit -r custom_components/ -ll
 
