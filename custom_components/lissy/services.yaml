@@ -3,8 +3,6 @@ renew:
   description: >
     Target a book sensor to renew that item, or the Lissy device to renew all loans for that account.
   target:
-    device:
-      integration: lissy
     entity:
       - domain: sensor
         integration: lissy
