@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.0](https://github.com/jd1/ha-lissy/compare/v0.3.0...v0.4.0) (2026-07-20)
+
+
+### Features
+
+* **sensor:** add device_class=DATE to date-returning sensors ([d2e9732](https://github.com/jd1/ha-lissy/commit/d2e9732609cd44d80622d694e6f4ab469b23580e))
+
+
+### Bug Fixes
+
+* **config_flow:** strip username, drop username from reauth, URL selector for base_url ([d27901c](https://github.com/jd1/ha-lissy/commit/d27901c5969211c38be0f787780ed59112728135))
+* **coordinator:** pass config_entry to DataUpdateCoordinator; trigger reauth on auth failure in renew ([13f4f1a](https://github.com/jd1/ha-lissy/commit/13f4f1a8a9656debf735d35097dda01be356362a))
+* **dev:** include automations.yaml in configuration.yaml stub ([7625131](https://github.com/jd1/ha-lissy/commit/76251315fc89f7ce227b233aa76494f12c63b21c))
+* **lissy:** add CONFIG_SCHEMA required by hassfest ([eec8148](https://github.com/jd1/ha-lissy/commit/eec8148d32b62c5fa6f682acc6239581d1124676))
+* **lissy:** remove unsupported device filter from renew service target ([b8ce95a](https://github.com/jd1/ha-lissy/commit/b8ce95a8821bb0e8f02650ab4cc902ce31ad4252))
+* remove duplicate DeviceInfo registration from __init__.py ([af51e53](https://github.com/jd1/ha-lissy/commit/af51e53a67010250ff38bb8d300430f0f69a87ce))
+* **scraper:** urljoin for host derivation, header-anchored table selection, redact session tokens from debug logs ([83dad18](https://github.com/jd1/ha-lissy/commit/83dad186c007cecf4d25f83fb27575f6a7a36d1a))
+
 ## [0.3.0](https://github.com/jd1/ha-lissy/compare/v0.2.0...v0.3.0) (2026-07-15)
 
 
