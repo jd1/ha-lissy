@@ -8,6 +8,8 @@ from typing import Any
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     TextSelector,
     TextSelectorConfig,
@@ -28,12 +30,13 @@ STEP_SCHEMA = vol.Schema(
 )
 
 
-async def _validate(user_input: dict[str, Any]) -> str | None:
+async def _validate(hass: HomeAssistant, user_input: dict[str, Any]) -> str | None:
     """Return an error key, or None if the credentials work."""
     client = LissyClient(
         user_input["username"],
         user_input["password"],
         user_input.get("base_url", DEFAULT_BASE_URL),
+        session=async_get_clientsession(hass),
     )
     try:
         await client.list_loans()
@@ -51,7 +54,7 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             user_input["username"] = user_input["username"].strip()
-            error = await _validate(user_input)
+            error = await _validate(self.hass, user_input)
             if error:
                 errors["base"] = error
             else:
@@ -76,7 +79,7 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         reauth_entry = self._get_reauth_entry()
         if user_input is not None:
             merged = {**reauth_entry.data, "password": user_input["password"]}
-            error = await _validate(merged)
+            error = await _validate(self.hass, merged)
             if error:
                 errors["base"] = error
             else:
