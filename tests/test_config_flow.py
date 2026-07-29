@@ -12,7 +12,11 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.lissy.api import LissyAuthError, LissyConnectionError
 from custom_components.lissy.const import DOMAIN
 
-USER_INPUT = {"username": "12345", "password": "secret", "base_url": "http://x"}
+USER_INPUT = {
+    "username": "12345",
+    "password": "secret",
+    "base_url": "http://x/lissy/lissy.ly",
+}
 
 
 def _patch_client(list_loans=None):
@@ -58,6 +62,24 @@ async def test_user_flow_errors(hass, exc, expected):
     assert result["errors"] == {"base": expected}
 
 
+async def test_user_flow_invalid_url(hass):
+    """A base_url not ending in lissy/lissy.ly is rejected before any network call."""
+    client = AsyncMock()
+    client.list_loans = AsyncMock(return_value=[])
+    with patch("custom_components.lissy.config_flow.LissyClient", return_value=client):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {"username": "12345", "password": "secret", "base_url": "http://x"},
+        )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_url"}
+    client.list_loans.assert_not_awaited()
+
+
 async def test_duplicate_aborts(hass):
     MockConfigEntry(domain=DOMAIN, unique_id="12345", data=USER_INPUT).add_to_hass(hass)
 
@@ -91,7 +113,7 @@ async def test_reauth_flow_updates_password(hass):
     assert result["reason"] == "reauth_successful"
     assert entry.data["password"] == "newpin"
     # base_url from the original entry is preserved through the merge
-    assert entry.data["base_url"] == "http://x"
+    assert entry.data["base_url"] == "http://x/lissy/lissy.ly"
 
 
 async def test_reauth_flow_invalid_auth(hass):

@@ -7,6 +7,9 @@
           "username": "Ausweisnummer",
           "password": "PIN / Passwort",
           "base_url": "Lissy URL"
+        },
+        "data_description": {
+          "base_url": "Muss auf lissy/lissy.ly enden"
         }
       },
       "reauth_confirm": {
@@ -19,7 +22,8 @@
     },
     "error": {
       "invalid_auth": "Ungültige Anmeldedaten",
-      "cannot_connect": "Verbindung zum Bibliotheksportal fehlgeschlagen"
+      "cannot_connect": "Verbindung zum Bibliotheksportal fehlgeschlagen",
+      "invalid_url": "Die URL muss auf lissy/lissy.ly enden"
     },
     "abort": {
       "already_configured": "Dieses Bibliothekskonto ist bereits eingerichtet",

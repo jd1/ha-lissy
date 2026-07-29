@@ -19,6 +19,8 @@ from homeassistant.helpers.selector import (
 from .api import DEFAULT_BASE_URL, LissyAuthError, LissyClient, LissyConnectionError
 from .const import DOMAIN
 
+_URL_SUFFIX = "lissy/lissy.ly"
+
 STEP_SCHEMA = vol.Schema(
     {
         vol.Required("username"): str,
@@ -32,10 +34,13 @@ STEP_SCHEMA = vol.Schema(
 
 async def _validate(hass: HomeAssistant, user_input: dict[str, Any]) -> str | None:
     """Return an error key, or None if the credentials work."""
+    base_url = user_input.get("base_url", DEFAULT_BASE_URL)
+    if not base_url.rstrip("/").endswith(_URL_SUFFIX):
+        return "invalid_url"
     client = LissyClient(
         user_input["username"],
         user_input["password"],
-        user_input.get("base_url", DEFAULT_BASE_URL),
+        base_url,
         session=async_get_clientsession(hass),
     )
     try:
