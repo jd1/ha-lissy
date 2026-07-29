@@ -16,13 +16,15 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import LoanItem, MediaType, parse_leihfrist
 from .const import DOMAIN, ITEM_ID_SEP
-from .coordinator import LissyCoordinator
+from .coordinator import LissyConfigEntry, LissyCoordinator
 
 PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: LissyConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: LissyCoordinator = entry.runtime_data
     async_add_entities(

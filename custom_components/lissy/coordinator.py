@@ -15,6 +15,8 @@ from .const import DOMAIN, UPDATE_INTERVAL_HOURS
 
 _LOGGER = logging.getLogger(__name__)
 
+type LissyConfigEntry = ConfigEntry[LissyCoordinator]
+
 
 class LissyCoordinator(DataUpdateCoordinator[list[LoanItem]]):
     def __init__(

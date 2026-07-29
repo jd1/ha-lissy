@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -13,11 +12,9 @@ from homeassistant.helpers import (
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import LissyAuthError, LissyClient, LissyConnectionError
+from .api import DEFAULT_BASE_URL, LissyAuthError, LissyClient, LissyConnectionError
 from .const import DOMAIN, ITEM_ID_SEP
-from .coordinator import LissyCoordinator
-
-type LissyConfigEntry = ConfigEntry[LissyCoordinator]
+from .coordinator import LissyConfigEntry, LissyCoordinator
 
 PLATFORMS = [Platform.SENSOR, Platform.CALENDAR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -94,9 +91,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    from .api import DEFAULT_BASE_URL
-
+async def async_setup_entry(hass: HomeAssistant, entry: LissyConfigEntry) -> bool:
     client = LissyClient(
         entry.data["username"],
         entry.data["password"],
@@ -112,5 +107,5 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: LissyConfigEntry) -> bool:
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
