@@ -13,6 +13,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .api import LoanItem, MediaType, parse_leihfrist
 from .const import DOMAIN, ITEM_ID_SEP
@@ -133,7 +134,7 @@ class LissyNextDueSensor(_LissyBase):
             "media_id": item["media_id"],
             "title": item["title"],
             "type": item["media_type"],
-            "days_until_due": (due - date.today()).days,
+            "days_until_due": (due - dt_util.now().date()).days,
         }
 
 
@@ -180,7 +181,7 @@ class LissyItemSensor(_LissyBase):
             "media_id": item["media_id"],
             "media_type": item["media_type"],
             "note": item["note"],
-            "days_until_due": (due - date.today()).days if due else None,
+            "days_until_due": (due - dt_util.now().date()).days if due else None,
         }
 
 
