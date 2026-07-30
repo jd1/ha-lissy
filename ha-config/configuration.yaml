@@ -4,3 +4,5 @@ automation: !include automations.yaml
 
 logger:
   default: warning
+  logs:
+    custom_components.lissy: debug

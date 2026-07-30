@@ -19,16 +19,16 @@ from .coordinator import LissyConfigEntry, LissyCoordinator
 PLATFORMS = [Platform.SENSOR, Platform.CALENDAR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-# TODO: remove once all entries have migrated past version 1 (no more users
-# on the old default base_url).
-_LEGACY_DEFAULT_BASE_URL = "https://stb.schwaebisch-gmuend.de/lissy/lissy.ly"
-
 
 async def async_migrate_entry(hass: HomeAssistant, entry: LissyConfigEntry) -> bool:
     """Migrate old config entries to the current schema."""
     if entry.version == 1:
         new_data = {**entry.data}
-        new_data.setdefault("base_url", _LEGACY_DEFAULT_BASE_URL)
+        # TODO: remove this backfill once all entries have migrated past
+        # version 1 (no more users on the old default base_url).
+        new_data.setdefault(
+            "base_url", "https://stb.schwaebisch-gmuend.de/lissy/lissy.ly"
+        )
         hass.config_entries.async_update_entry(entry, data=new_data, version=2)
     return True
 

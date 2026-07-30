@@ -34,7 +34,14 @@ POST_LOGIN_HTML = (
     "</body></html>"
 )
 
-POST_LOGIN_BAD_HTML = "<html><body>Ungültige Anmeldedaten</body></html>"
+# Real invalid-login response is the login frameset again (type=topeframe/
+# bottomeframe) — same shape as LOGIN_PAGE_HTML, whereas a real session's
+# frameset uses type=topframe/bottomframe (no "e").
+POST_LOGIN_BAD_HTML = LOGIN_PAGE_HTML
+
+# A malformed/plain-text response with no c= token at all — hits the other
+# failure branch (`not match`).
+POST_LOGIN_NO_TOKEN_HTML = "<html><body>Ungültige Anmeldedaten</body></html>"
 
 TOPFRAME_HTML = (
     "<html><body>"
@@ -244,6 +251,18 @@ async def test_login_bad_credentials_raises_auth_error():
     session = MagicMock()
     session.get = MagicMock(side_effect=_cm(_mock_response(LOGIN_PAGE_HTML)))
     session.post = MagicMock(side_effect=_cm(_mock_response(POST_LOGIN_BAD_HTML)))
+
+    with pytest.raises(LissyAuthError):
+        await client._login(session)
+
+
+@pytest.mark.asyncio
+async def test_login_no_token_raises_auth_error():
+    """A response without a c= token at all is a login failure, not success."""
+    client = LissyClient("user123", "wrongpass", "http://x/lissy/lissy.ly")
+    session = MagicMock()
+    session.get = MagicMock(side_effect=_cm(_mock_response(LOGIN_PAGE_HTML)))
+    session.post = MagicMock(side_effect=_cm(_mock_response(POST_LOGIN_NO_TOKEN_HTML)))
 
     with pytest.raises(LissyAuthError):
         await client._login(session)

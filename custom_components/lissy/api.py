@@ -148,9 +148,10 @@ class LissyClient:
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             raise LissyConnectionError(str(e)) from e
 
-        match = re.search(r"[?&]c=([a-z0-9]+)", text2, re.IGNORECASE)
-        if not match:
+        if _LOGGER.isEnabledFor(logging.DEBUG):
             _LOGGER.debug("Post-login page HTML: %s", _redact_tokens(text2))
+        match = re.search(r"[?&]c=([a-z0-9]+)", text2, re.IGNORECASE)
+        if not match or "type=topeframe" in text2:
             raise LissyAuthError(
                 "Login failed — bad credentials or unexpected response"
             )
