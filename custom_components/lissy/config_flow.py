@@ -16,7 +16,7 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
-from .api import DEFAULT_BASE_URL, LissyAuthError, LissyClient, LissyConnectionError
+from .api import LissyAuthError, LissyClient, LissyConnectionError
 from .const import DOMAIN
 
 _URL_SUFFIX = "lissy/lissy.ly"
@@ -25,7 +25,7 @@ STEP_SCHEMA = vol.Schema(
     {
         vol.Required("username"): str,
         vol.Required("password"): str,
-        vol.Optional("base_url", default=DEFAULT_BASE_URL): TextSelector(
+        vol.Required("base_url"): TextSelector(
             TextSelectorConfig(type=TextSelectorType.URL)
         ),
     }
@@ -34,7 +34,7 @@ STEP_SCHEMA = vol.Schema(
 
 async def _validate(hass: HomeAssistant, user_input: dict[str, Any]) -> str | None:
     """Return an error key, or None if the credentials work."""
-    base_url = user_input.get("base_url", DEFAULT_BASE_URL)
+    base_url = user_input["base_url"]
     if not base_url.rstrip("/").endswith(_URL_SUFFIX):
         return "invalid_url"
     client = LissyClient(
@@ -53,7 +53,7 @@ async def _validate(hass: HomeAssistant, user_input: dict[str, Any]) -> str | No
 
 
 class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    VERSION = 1
+    VERSION = 2
 
     async def async_step_user(self, user_input=None) -> ConfigFlowResult:
         errors: dict[str, str] = {}

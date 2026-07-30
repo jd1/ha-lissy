@@ -15,7 +15,6 @@ from bs4 import BeautifulSoup
 
 _LOGGER = logging.getLogger(__name__)
 
-DEFAULT_BASE_URL = "https://stb.schwaebisch-gmuend.de/lissy/lissy.ly"
 _TIMEOUT = aiohttp.ClientTimeout(total=30)
 
 
@@ -101,7 +100,7 @@ class LissyClient:
         self,
         username: str,
         password: str,
-        base_url: str = DEFAULT_BASE_URL,
+        base_url: str,
         session: aiohttp.ClientSession | None = None,
     ) -> None:
         self._username = username

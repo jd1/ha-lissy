@@ -12,12 +12,25 @@ from homeassistant.helpers import (
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import DEFAULT_BASE_URL, LissyAuthError, LissyClient, LissyConnectionError
+from .api import LissyAuthError, LissyClient, LissyConnectionError
 from .const import DOMAIN, ITEM_ID_SEP
 from .coordinator import LissyConfigEntry, LissyCoordinator
 
 PLATFORMS = [Platform.SENSOR, Platform.CALENDAR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+# TODO: remove once all entries have migrated past version 1 (no more users
+# on the old default base_url).
+_LEGACY_DEFAULT_BASE_URL = "https://stb.schwaebisch-gmuend.de/lissy/lissy.ly"
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: LissyConfigEntry) -> bool:
+    """Migrate old config entries to the current schema."""
+    if entry.version == 1:
+        new_data = {**entry.data}
+        new_data.setdefault("base_url", _LEGACY_DEFAULT_BASE_URL)
+        hass.config_entries.async_update_entry(entry, data=new_data, version=2)
+    return True
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -95,7 +108,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: LissyConfigEntry) -> boo
     client = LissyClient(
         entry.data["username"],
         entry.data["password"],
-        entry.data.get("base_url", DEFAULT_BASE_URL),
+        entry.data["base_url"],
         session=async_get_clientsession(hass),
     )
     coordinator = LissyCoordinator(hass, client, entry)

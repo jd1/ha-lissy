@@ -50,6 +50,31 @@ async def _setup(hass, list_loans=None, renew=None):
     return entry, client
 
 
+async def test_migrates_legacy_entry_without_base_url(hass):
+    """Entries created before base_url was required get it backfilled, and
+    the entry's schema version is bumped to the current VERSION."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="12345",
+        title="Lissy (12345)",
+        data={"username": "12345", "password": "secret"},  # no base_url
+        version=1,
+    )
+    entry.add_to_hass(hass)
+
+    client = AsyncMock()
+    client.list_loans = AsyncMock(return_value=[])
+
+    with patch("custom_components.lissy.LissyClient", return_value=client):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert entry.data["base_url"] == "https://stb.schwaebisch-gmuend.de/lissy/lissy.ly"
+    assert entry.version == 2
+    assert entry.data["username"] == "12345"
+    assert entry.data["password"] == "secret"
+
+
 async def test_setup_creates_entities(hass):
     await _setup(hass)
 
