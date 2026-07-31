@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-import time
 from datetime import date
 from enum import StrEnum
 from typing import Any, NotRequired, TypedDict
@@ -17,7 +16,6 @@ from bs4 import BeautifulSoup
 _LOGGER = logging.getLogger(__name__)
 
 _TIMEOUT = aiohttp.ClientTimeout(total=30)
-_SESSION_TTL = 600  # seconds before a cached session token is re-logged
 
 
 class MediaType(StrEnum):
@@ -112,8 +110,6 @@ class LissyClient:
         self._password = password
         self._base_url = base_url
         self._shared_session = session
-        self._c: str | None = None
-        self._c_time: float = 0.0
 
     def _new_session(self) -> aiohttp.ClientSession:
         return aiohttp.ClientSession(headers=_HEADERS, timeout=_TIMEOUT)
@@ -164,18 +160,6 @@ class LissyClient:
                 "Login failed — bad credentials or unexpected response"
             )
         return match.group(1)
-
-    async def _get_c(self, session: aiohttp.ClientSession) -> str:
-        """Return a valid session token, logging in only when the cached one is stale."""
-        if self._c is not None and (time.monotonic() - self._c_time) < _SESSION_TTL:
-            return self._c
-        try:
-            self._c = await self._login(session)
-        except LissyAuthError:
-            self._c = None
-            raise
-        self._c_time = time.monotonic()
-        return self._c
 
     async def _entl_html(self, session: aiohttp.ClientSession, c: str) -> str:
         try:
@@ -280,14 +264,14 @@ class LissyClient:
 
     async def list_loans(self) -> list[LoanItem]:
         async with await self._get_session() as session:
-            c = await self._get_c(session)
+            c = await self._login(session)
             html = await self._entl_html(session, c)
         return self._parse_rows(html)
 
     async def renew(self, targets: set[str] | None = None) -> RenewResponse:
         """Renew loans. ``targets`` = mednrs to renew, or None for all."""
         async with await self._get_session() as session:
-            c = await self._get_c(session)
+            c = await self._login(session)
             html = await self._entl_html(session, c)
             all_media = self._parse_checkboxes(html)
 
