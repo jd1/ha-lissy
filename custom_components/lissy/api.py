@@ -123,9 +123,10 @@ class LissyClient:
         m_mgc = re.search(r"[?&]mgcnum=([A-Z0-9]+)", text, re.IGNORECASE)
         m_bnr = re.search(r"[?&]bnrlgncke=([a-z0-9]+)", text, re.IGNORECASE)
         if not (m_c and m_mgc and m_bnr):
-            _LOGGER.debug(
-                "Login page HTML (first 5000 chars): %s", _redact_tokens(text)
-            )
+            if _LOGGER.isEnabledFor(logging.DEBUG):
+                _LOGGER.debug(
+                    "Login page HTML (first 5000 chars): %s", _redact_tokens(text)
+                )
             raise LissyConnectionError("Unexpected login page structure")
         c = m_c.group(1)
         mgcnum = m_mgc.group(1)
@@ -302,9 +303,10 @@ class LissyClient:
             table = next((t for t in soup.find_all("table") if t.find("th")), None)
             if not table:
                 _LOGGER.warning("Renewal response had no result table")
-                _LOGGER.debug(
-                    "Tableless renewal response HTML: %s", _redact_tokens(text)
-                )
+                if _LOGGER.isEnabledFor(logging.DEBUG):
+                    _LOGGER.debug(
+                        "Tableless renewal response HTML: %s", _redact_tokens(text)
+                    )
                 renewed: list[RenewResult] = [
                     RenewResult(
                         media_id=m["value"],
