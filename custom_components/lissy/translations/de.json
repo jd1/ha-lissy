@@ -30,5 +30,11 @@
       "already_in_progress": "Einrichtung läuft bereits",
       "reauth_successful": "Erneute Anmeldung erfolgreich"
     }
+  },
+  "services": {
+    "renew": {
+      "name": "Leihfristen verlängern",
+      "description": "Wähle einen Buch-Sensor um ein einzelnes Exemplar zu verlängern, oder das Lissy-Gerät um alle Ausleihen des Kontos zu verlängern."
+    }
   }
 }

@@ -30,5 +30,11 @@
       "already_in_progress": "Configuration is already in progress",
       "reauth_successful": "Re-authentication was successful"
     }
+  },
+  "services": {
+    "renew": {
+      "name": "Renew loans",
+      "description": "Target a book sensor to renew that item, or the Lissy device to renew all loans for that account."
+    }
   }
 }

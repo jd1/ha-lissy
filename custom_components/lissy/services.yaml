@@ -6,3 +6,5 @@ renew:
     entity:
       - domain: sensor
         integration: lissy
+    device:
+      - integration: lissy
