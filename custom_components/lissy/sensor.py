@@ -10,14 +10,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .api import LoanItem, MediaType, parse_leihfrist
 from .const import DOMAIN, ITEM_ID_SEP
 from .coordinator import LissyConfigEntry, LissyCoordinator
+from .entity import LissyEntity
 
 PARALLEL_UPDATES = 0
 
@@ -62,20 +61,9 @@ async def async_setup_entry(
     entry.async_on_unload(coordinator.async_add_listener(_sync_item_sensors))
 
 
-class _LissyBase(CoordinatorEntity[LissyCoordinator], SensorEntity):
-    _attr_has_entity_name = True
-
+class _LissyBase(LissyEntity, SensorEntity):
     def __init__(self, coordinator: LissyCoordinator, entry: ConfigEntry) -> None:
-        super().__init__(coordinator)
-        self._entry = entry
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._entry.entry_id)},
-            name=self._entry.title,
-            manufacturer="Lissy",
-        )
+        super().__init__(coordinator, entry)
 
 
 class LissyCountSensor(_LissyBase):
