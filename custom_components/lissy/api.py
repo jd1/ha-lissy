@@ -84,6 +84,14 @@ def parse_leihfrist(value: str) -> date | None:
     return None
 
 
+_ZWSP = "\u200b"
+
+
+def _clean(text: str) -> str:
+    """Strip zero-width spaces that Lissy portals inject into table cells."""
+    return text.replace(_ZWSP, "")
+
+
 def _redact_tokens(html: str) -> str:
     """Redact session tokens from HTML before logging to prevent replay attacks."""
     redacted = re.sub(r"([?&](c|mgcnum|bnrlgncke)=)[a-zA-Z0-9]+", r"\1[REDACTED]", html)
@@ -228,11 +236,11 @@ class LissyClient:
                     )
             rows.append(
                 LoanItem(
-                    media_id=cells[2].get_text(strip=True).replace("​", ""),
+                    media_id=_clean(cells[2].get_text(strip=True)),
                     media_type=_MEDIA_TYPE_MAP.get(raw_type, MediaType.UNKNOWN),
-                    title=cells[3].get_text(strip=True).replace("​", ""),
-                    due_date=cells[4].get_text(strip=True).replace("​", ""),
-                    note=cells[5].get_text(strip=True).replace("​", ""),
+                    title=_clean(cells[3].get_text(strip=True)),
+                    due_date=_clean(cells[4].get_text(strip=True)),
+                    note=_clean(cells[5].get_text(strip=True)),
                 )
             )
         return rows
@@ -330,11 +338,11 @@ class LissyClient:
                         continue
                     renewed.append(
                         RenewResult(
-                            media_id=cells[0].get_text(strip=True).replace("​", ""),
-                            due_date=cells[2].get_text(strip=True).replace("​", ""),
+                            media_id=_clean(cells[0].get_text(strip=True)),
+                            due_date=_clean(cells[2].get_text(strip=True)),
                             renewed=cells[3].get_text(strip=True) == "Ja",
                             reason=(
-                                cells[4].get_text(strip=True).replace("​", "")
+                                _clean(cells[4].get_text(strip=True))
                                 if len(cells) > 4
                                 else ""
                             ),
