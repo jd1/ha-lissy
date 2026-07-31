@@ -257,3 +257,49 @@ async def test_returned_book_entity_is_removed(hass):
 
     assert reg.async_get("sensor.lissy_12345_book_one") is None
     assert reg.async_get("sensor.lissy_12345_dvd_two") is not None
+
+
+async def test_migrate_entry_already_current_version(hass):
+    """An entry already at the current version passes through unchanged."""
+    from custom_components.lissy import async_migrate_entry
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="12345",
+        title="Lissy (12345)",
+        data={"username": "12345", "password": "secret", "base_url": "http://x"},
+        version=2,
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry) is True
+    assert entry.version == 2
+    assert entry.data["base_url"] == "http://x"
+
+
+async def test_renew_device_without_setup_is_noop(hass):
+    """Targeting a device whose config entry isn't set up doesn't crash."""
+    from homeassistant.helpers import device_registry as dr
+
+    # Set up one working entry so the renew service is registered.
+    _, client = await _setup(hass)
+
+    # A second entry that was NOT set up — runtime_data stays None.
+    entry2 = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="99999",
+        title="Lissy (99999)",
+        data={"username": "99999", "password": "secret", "base_url": "http://x"},
+    )
+    entry2.add_to_hass(hass)
+
+    dev_reg = dr.async_get(hass)
+    device = dev_reg.async_get_or_create(
+        config_entry_id=entry2.entry_id,
+        identifiers={(DOMAIN, entry2.entry_id)},
+    )
+
+    await hass.services.async_call(
+        DOMAIN, "renew", {}, target={"device_id": device.id}, blocking=True
+    )
+    client.renew.assert_not_awaited()

@@ -73,3 +73,12 @@ async def test_get_events_window_is_inclusive_both_ends(hass):
         hass, datetime(2026, 6, 30), datetime(2026, 7, 15)
     )
     assert {e.summary for e in events} == {"Book One", "DVD Two"}
+
+
+async def test_get_events_empty_list(hass):
+    """An empty loan list yields no events."""
+    cal = _calendar([])
+    events = await cal.async_get_events(
+        hass, datetime(2026, 6, 1), datetime(2026, 7, 1)
+    )
+    assert events == []

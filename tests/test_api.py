@@ -10,6 +10,7 @@ from api import (
     LissyAuthError,
     LissyClient,
     LissyConnectionError,
+    _redact_tokens,
     parse_leihfrist,
 )
 
@@ -466,3 +467,29 @@ def test_parse_leihfrist_valid():
 def test_parse_leihfrist_invalid():
     assert parse_leihfrist("not a date") is None
     assert parse_leihfrist("") is None
+
+
+# ---------------------------------------------------------------------------
+# _redact_tokens
+# ---------------------------------------------------------------------------
+
+
+def test_redact_tokens_redacts_session_tokens():
+    html = "?c=secret123&mgcnum=ABC123&bnrlgncke=xyz789&other=keep"
+    redacted = _redact_tokens(html)
+    assert "secret123" not in redacted
+    assert "ABC123" not in redacted
+    assert "xyz789" not in redacted
+    assert "[REDACTED]" in redacted
+    assert "keep" in redacted
+
+
+def test_redact_tokens_truncates_long_html():
+    html = "x" * 10000
+    redacted = _redact_tokens(html)
+    assert len(redacted) == 5000
+
+
+def test_redact_tokens_preserves_short_html_without_tokens():
+    html = "<html>nothing here</html>"
+    assert _redact_tokens(html) == html
