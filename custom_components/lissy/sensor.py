@@ -149,8 +149,6 @@ class LissyItemSensor(_LissyBase):
         super().__init__(coordinator, entry)
         self._media_id = item["media_id"]
         self._attr_unique_id = f"{entry.entry_id}{ITEM_ID_SEP}{self._media_id}"
-        self._attr_name = item["title"]
-        self._attr_icon = _icon_for_type(item["media_type"])
 
     def _item(self) -> LoanItem | None:
         return next(
@@ -164,7 +162,19 @@ class LissyItemSensor(_LissyBase):
 
     @property
     def available(self) -> bool:
-        return self._item() is not None
+        return self.coordinator.last_update_success and self._item() is not None
+
+    @property
+    def name(self) -> str | None:
+        if item := self._item():
+            return item["title"]
+        return None
+
+    @property
+    def icon(self) -> str:
+        if item := self._item():
+            return _icon_for_type(item["media_type"])
+        return "mdi:library"
 
     @property
     def native_value(self) -> date | None:
