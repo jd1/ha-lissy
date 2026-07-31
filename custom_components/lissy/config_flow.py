@@ -32,24 +32,23 @@ STEP_SCHEMA = vol.Schema(
 )
 
 
-async def _validate(hass: HomeAssistant, user_input: dict[str, Any]) -> str | None:
-    """Return an error key, or None if the credentials work."""
-    base_url = user_input["base_url"]
-    if not base_url.rstrip("/").endswith(_URL_SUFFIX):
-        return "invalid_url"
+async def _validate_credentials(
+    hass: HomeAssistant, user_input: dict[str, Any]
+) -> dict[str, str]:
+    """Return a form errors dict (field -> error key), empty if credentials work."""
     client = LissyClient(
         user_input["username"],
         user_input["password"],
-        base_url,
+        user_input["base_url"],
         session=async_get_clientsession(hass),
     )
     try:
         await client.list_loans()
     except LissyAuthError:
-        return "invalid_auth"
+        return {"base": "invalid_auth"}
     except LissyConnectionError:
-        return "cannot_connect"
-    return None
+        return {"base": "cannot_connect"}
+    return {}
 
 
 class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -59,10 +58,11 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             user_input["username"] = user_input["username"].strip()
-            error = await _validate(self.hass, user_input)
-            if error:
-                errors["base"] = error
+            if not user_input["base_url"].rstrip("/").endswith(_URL_SUFFIX):
+                errors = {"base_url": "invalid_url"}
             else:
+                errors = await _validate_credentials(self.hass, user_input)
+            if not errors:
                 await self.async_set_unique_id(user_input["username"])
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
@@ -84,10 +84,8 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         reauth_entry = self._get_reauth_entry()
         if user_input is not None:
             merged = {**reauth_entry.data, "password": user_input["password"]}
-            error = await _validate(self.hass, merged)
-            if error:
-                errors["base"] = error
-            else:
+            errors = await _validate_credentials(self.hass, merged)
+            if not errors:
                 await self.async_set_unique_id(reauth_entry.unique_id)
                 self._abort_if_unique_id_mismatch()
                 return self.async_update_reload_and_abort(reauth_entry, data=merged)

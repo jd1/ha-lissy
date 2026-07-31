@@ -76,7 +76,7 @@ async def test_user_flow_invalid_url(hass):
         )
 
     assert result["type"] == FlowResultType.FORM
-    assert result["errors"] == {"base": "invalid_url"}
+    assert result["errors"] == {"base_url": "invalid_url"}
     client.list_loans.assert_not_awaited()
 
 
