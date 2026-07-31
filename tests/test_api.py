@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from contextlib import asynccontextmanager
@@ -11,6 +13,7 @@ from api import (
     LissyClient,
     LissyConnectionError,
     _redact_tokens,
+    _WARNED_TYPES,
     parse_leihfrist,
 )
 
@@ -203,6 +206,44 @@ def test_parse_rows_unknown_media_type():
     html = LOANS_HTML.replace("buch.gif", "unbekannt.gif")
     rows = LissyClient._parse_rows(html)
     assert rows[0]["media_type"] == "unknown"
+
+
+def test_parse_rows_unknown_media_type_logs_warning(caplog):
+    """Unknown media-type icons are logged at WARNING, not ERROR."""
+    _WARNED_TYPES.clear()
+    html = LOANS_HTML.replace("buch.gif", "unbekannt.gif")
+    with caplog.at_level(logging.WARNING, logger="api"):
+        LissyClient._parse_rows(html)
+    assert any(
+        r.levelno == logging.WARNING and "unbekannt" in r.message
+        for r in caplog.records
+    )
+    assert not any(r.levelno == logging.ERROR for r in caplog.records)
+
+
+def test_parse_rows_unknown_media_type_deduplicated(caplog):
+    """Each unknown type is logged only once across multiple rows."""
+    _WARNED_TYPES.clear()
+    html = LOANS_HTML.replace("dvd.gif", "unbekannt.gif").replace(
+        "spiel.gif", "unbekannt.gif"
+    )
+    with caplog.at_level(logging.WARNING, logger="api"):
+        LissyClient._parse_rows(html)
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert "unbekannt" in warnings[0].message
+
+
+def test_parse_rows_different_unknown_types_both_warned(caplog):
+    """Dedup is per type — distinct unknown icons each log once."""
+    _WARNED_TYPES.clear()
+    html = LOANS_HTML.replace("dvd.gif", "typa.gif").replace("spiel.gif", "typb.gif")
+    with caplog.at_level(logging.WARNING, logger="api"):
+        LissyClient._parse_rows(html)
+    messages = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(messages) == 2
+    assert any("typa" in m for m in messages)
+    assert any("typb" in m for m in messages)
 
 
 # ---------------------------------------------------------------------------
@@ -418,6 +459,37 @@ async def test_renew_no_result_table_reports_failure():
     assert result["renewed"]
     assert all(r["renewed"] is False for r in result["renewed"])
     assert all(r["reason"] == "no response table" for r in result["renewed"])
+
+
+@pytest.mark.asyncio
+async def test_renew_tableless_skips_second_entl_fetch():
+    """When no result table is returned, the loans list is reused instead
+    of triggering a second _entl_html page load."""
+    client = LissyClient("user123", "pass456", "http://x/lissy/lissy.ly")
+    responses = iter(
+        [
+            _mock_response(LOGIN_PAGE_HTML),
+            _mock_response(POST_LOGIN_HTML),
+            _mock_response(TOPFRAME_HTML),
+            _mock_response(CHECKBOXES_HTML + LOANS_HTML),
+            _mock_response("<html><body>no table here</body></html>"),
+        ]
+    )
+    session = MagicMock()
+    session.get = MagicMock(side_effect=lambda *a, **kw: _cm(next(responses))())
+    session.post = MagicMock(side_effect=lambda *a, **kw: _cm(next(responses))())
+
+    @asynccontextmanager
+    async def _session_cm():
+        yield session
+
+    with patch.object(client, "_new_session", return_value=_session_cm()):
+        result = await client.renew()
+
+    # login GET + topframe GET + entl GET = 3 GETs; no second _entl_html
+    # (5 responses queued, only 3 GETs consumed; renew POST used session.post).
+    assert session.get.call_count == 3
+    assert len(result["list"]) == 4
 
 
 @pytest.mark.asyncio
