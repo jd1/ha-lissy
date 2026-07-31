@@ -4,6 +4,8 @@ Tracks borrowed items from a Lissy-based public library system.
 
 > **Disclaimer:** This project is an independent, community-developed integration and is not affiliated with, endorsed by, or officially supported by sdt.net AG, BIBLIS, or the LISSY system. All product names and trademarks are the property of their respective owners.
 
+> **Note:** Parts of this code were written and reviewed with the help of AI coding agents (opencode).
+
 ## Features
 
 - **Sensors** for each borrowed item (state = due date)
