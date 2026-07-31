@@ -270,15 +270,13 @@ class LissyClient:
             if not all_media:
                 return {"renewed": [], "list": []}
 
-            to_renew = (
-                [m for m in all_media if m["value"] in targets]
-                if targets
-                else all_media
-            )
-            if targets:
+            if targets is not None:
+                to_renew = [m for m in all_media if m["value"] in targets]
                 missing = targets - {m["value"] for m in to_renew}
                 if missing:
                     raise ValueError(f"Med.nr. {', '.join(sorted(missing))} not found")
+            else:
+                to_renew = all_media
 
             data = {"pg": "verlaeng", "c": c, "medcnt": str(len(all_media))}
             for m in to_renew:

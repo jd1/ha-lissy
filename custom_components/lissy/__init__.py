@@ -53,7 +53,11 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             if device:
                 for ceid in device.config_entries:
                     e = hass.config_entries.async_get_entry(ceid)
-                    if e and e.domain == DOMAIN and hasattr(e, "runtime_data"):
+                    if (
+                        e
+                        and e.domain == DOMAIN
+                        and getattr(e, "runtime_data", None) is not None
+                    ):
                         targets_by_entry[ceid] = None
 
         reg = er.async_get(hass)
@@ -77,7 +81,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         cfg_entries = hass.config_entries
         for entry_id, targets in targets_by_entry.items():
             cfg_entry = cfg_entries.async_get_entry(entry_id)
-            if not cfg_entry or not hasattr(cfg_entry, "runtime_data"):
+            if not cfg_entry or getattr(cfg_entry, "runtime_data", None) is None:
                 continue
             coordinator: LissyCoordinator = cfg_entry.runtime_data
             try:
