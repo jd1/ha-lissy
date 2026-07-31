@@ -34,7 +34,13 @@
   "services": {
     "renew": {
       "name": "Renew loans",
-      "description": "Target a book sensor to renew that item, or the Lissy device to renew all loans for that account."
+      "description": "Target a book sensor to renew that item, or the Lissy device to renew all loans for that account.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The Lissy account device to renew all loans for. Leave empty if targeting a book sensor instead."
+        }
+      }
     }
   }
 }

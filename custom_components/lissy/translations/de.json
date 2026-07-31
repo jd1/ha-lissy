@@ -34,7 +34,13 @@
   "services": {
     "renew": {
       "name": "Leihfristen verlängern",
-      "description": "Wähle einen Buch-Sensor um ein einzelnes Exemplar zu verlängern, oder das Lissy-Gerät um alle Ausleihen des Kontos zu verlängern."
+      "description": "Wähle einen Medium-Sensor um ein einzelnes Exemplar zu verlängern, oder das Lissy-Gerät um alle Ausleihen des Kontos zu verlängern.",
+      "fields": {
+        "device_id": {
+          "name": "Gerät",
+          "description": "Das Lissy-Gerät, für das alle Ausleihen verlängert werden sollen. Leer lassen, wenn ein Sensor-Ziel verwendet wird."
+        }
+      }
     }
   }
 }

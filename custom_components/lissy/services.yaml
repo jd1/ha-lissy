@@ -6,5 +6,13 @@ renew:
     entity:
       - domain: sensor
         integration: lissy
-    device:
-      - integration: lissy
+  fields:
+    device_id:
+      name: Device
+      description: >
+        The Lissy account device to renew all loans for.
+        Leave empty if targeting a book sensor instead.
+      required: false
+      selector:
+        device:
+          integration: lissy
