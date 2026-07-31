@@ -24,7 +24,9 @@ _URL_SUFFIX = "lissy/lissy.ly"
 STEP_SCHEMA = vol.Schema(
     {
         vol.Required("username"): str,
-        vol.Required("password"): str,
+        vol.Required("password"): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.PASSWORD)
+        ),
         vol.Required("base_url"): TextSelector(
             TextSelectorConfig(type=TextSelectorType.URL)
         ),
@@ -92,6 +94,12 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required("password"): str}),
+            data_schema=vol.Schema(
+                {
+                    vol.Required("password"): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                    )
+                }
+            ),
             errors=errors,
         )
