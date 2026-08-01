@@ -40,8 +40,14 @@ jobs:
         uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_AUTHOR_NAME: opencode[bot]
+          GIT_AUTHOR_EMAIL: opencode[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: opencode[bot]
+          GIT_COMMITTER_EMAIL: opencode[bot]@users.noreply.github.com
         with:
           model: opencode-go/glm-5.2
           prompt: ${{ github.event.inputs.prompt }}
           agent: ${{ github.event.inputs.agent }}
+          use_github_token: true
         timeout-minutes: 30
