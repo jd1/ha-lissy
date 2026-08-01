@@ -294,7 +294,14 @@ class LissyClient:
             else:
                 to_renew = all_media
 
-            data = {"pg": "verlaeng", "c": c, "medcnt": str(len(all_media))}
+            data = {
+                "pg": "verlaeng",
+                "c": c,
+                # The server expects the total number of media on the
+                # account, not the number being renewed, otherwise the
+                # renewal request is rejected.
+                "medcnt": str(len(all_media)),
+            }
             for m in to_renew:
                 data[m["name"]] = m["value"]
 
@@ -307,6 +314,9 @@ class LissyClient:
                 right_frame = frameset.find("frame", attrs={"name": "toprightframe"})
                 if right_frame:
                     raw_src = str(right_frame.get("src", ""))
+                    # Lissy emits a malformed src of the form
+                    # "pg=...??c=...&&..." — collapse the doubled "??" and
+                    # "&&" into a single "?" so urljoin produces a valid URL.
                     frame_url = urljoin(self._base_url, raw_src.replace("??&&", "?"))
                     async with session.get(frame_url) as r:
                         r.raise_for_status()
