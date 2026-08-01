@@ -43,6 +43,8 @@ class LissyCalendar(LissyEntity, CalendarEntity):
                         start=due_date,
                         end=due_date + timedelta(days=1),
                         summary=item["title"],
+                        uid=f"{self._entry.entry_id}_{item['media_id']}",
+                        description=item["note"],
                     )
                 )
         return events
