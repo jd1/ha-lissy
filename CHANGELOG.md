@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.5.0](https://github.com/jd1/ha-lissy/compare/v0.4.0...v0.5.0) (2026-08-03)
+
+
+### Features
+
+* **config_flow:** reject base_url that doesn't end with lissy/lissy.ly ([babdb02](https://github.com/jd1/ha-lissy/commit/babdb0260dc32b69c1b33f33b8cb1aa1ae090a28))
+* **lissy:** expose device targets and add service translations ([8ec63ea](https://github.com/jd1/ha-lissy/commit/8ec63ea49ca942bfda5e7f3c291152f3c591cd21))
+
+
+### Bug Fixes
+
+* **api:** cache session token, dedupe media-type warnings, skip redundant refetch ([4f5ee71](https://github.com/jd1/ha-lissy/commit/4f5ee717f9ab1263bb570c133e769d8a9cab17ec))
+* **config_flow:** mask password field in config flow ([0b837f5](https://github.com/jd1/ha-lissy/commit/0b837f5b824e5f1c36660e77df11d8d3bafd57b8))
+* **config_flow:** reuse Home Assistant's client session during validation ([db0e10d](https://github.com/jd1/ha-lissy/commit/db0e10df08afb0be2c73c2db033a639c0757dbc0))
+* **lissy:** detect invalid-login frameset and tidy review findings ([9320478](https://github.com/jd1/ha-lissy/commit/9320478983f9720dd7254932ded40d0b7662e340))
+* **lissy:** guard token-redaction debug logs with isEnabledFor ([8e3225d](https://github.com/jd1/ha-lissy/commit/8e3225d20dad9730be3ba5ce00bff612d2aa6908))
+* **lissy:** guard unset runtime_data and empty renew target set ([907a62e](https://github.com/jd1/ha-lissy/commit/907a62e1c4bba38427dbe42a69485522b5fb74d0))
+* **lissy:** move renew device target to a service field ([a3b5217](https://github.com/jd1/ha-lissy/commit/a3b52170ff508afb32b7fa526fd418f58c4707e3))
+* **lissy:** require base_url and migrate legacy config entries ([e52074b](https://github.com/jd1/ha-lissy/commit/e52074bc28863d59e2966baab5c8e412e2fa6d7a))
+* **sensor:** track current item state in LissyItemSensor ([0bd91e9](https://github.com/jd1/ha-lissy/commit/0bd91e925e90670ab62399fb21c0e48348d40521))
+* **sensor:** use Home Assistant's configured timezone for days_until_due ([4b24cb9](https://github.com/jd1/ha-lissy/commit/4b24cb9dca308cd38b1ea3531571f3d0ce09da5c))
+
+
+### Reverts
+
+* **lissy:** drop session-token caching introduced for review finding [#11](https://github.com/jd1/ha-lissy/issues/11) ([90746d1](https://github.com/jd1/ha-lissy/commit/90746d16b6b0182549d4134a31f7826a2b6940da))
+
 ## [0.4.0](https://github.com/jd1/ha-lissy/compare/v0.3.0...v0.4.0) (2026-07-20)
 
 
