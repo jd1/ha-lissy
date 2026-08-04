@@ -106,6 +106,12 @@ class LissyConnectionError(Exception):
     pass
 
 
+class LissyNotFoundError(Exception):
+    def __init__(self, missing: set[str]) -> None:
+        self.missing = missing
+        super().__init__(f"Med.nr. {', '.join(sorted(self.missing))} not found")
+
+
 class LissyClient:
     def __init__(
         self,
@@ -290,7 +296,7 @@ class LissyClient:
                 to_renew = [m for m in all_media if m["value"] in targets]
                 missing = targets - {m["value"] for m in to_renew}
                 if missing:
-                    raise ValueError(f"Med.nr. {', '.join(sorted(missing))} not found")
+                    raise LissyNotFoundError(missing)
             else:
                 to_renew = all_media
 

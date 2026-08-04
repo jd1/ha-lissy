@@ -12,6 +12,7 @@ from api import (
     LissyAuthError,
     LissyClient,
     LissyConnectionError,
+    LissyNotFoundError,
     _redact_tokens,
     _WARNED_TYPES,
     parse_leihfrist,
@@ -421,7 +422,7 @@ async def test_renew_unknown_mednr_raises():
         _mock_response(CHECKBOXES_HTML + LOANS_HTML),
     )
     with patch.object(client, "_new_session", return_value=mock_session):
-        with pytest.raises(ValueError, match="not found"):
+        with pytest.raises(LissyNotFoundError, match="not found"):
             await client.renew(targets={"99999999"})
 
 

@@ -9,7 +9,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.lissy.api import LissyConnectionError
+from custom_components.lissy.api import LissyConnectionError, LissyNotFoundError
 from custom_components.lissy.const import DOMAIN
 
 LOANS = [
@@ -193,8 +193,8 @@ async def test_renew_connection_error_surfaces(hass):
 
 
 async def test_renew_unknown_mednr_is_validation_error(hass):
-    """H3: ValueError from the client → ServiceValidationError."""
-    renew = AsyncMock(side_effect=ValueError("Med.nr. 111 not found"))
+    """H3: LissyNotFoundError from the client → ServiceValidationError."""
+    renew = AsyncMock(side_effect=LissyNotFoundError({"111"}))
     _, _ = await _setup(hass, renew=renew)
 
     with pytest.raises(ServiceValidationError):
