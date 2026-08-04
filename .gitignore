@@ -5,6 +5,7 @@
 __pycache__/
 .pytest_cache/
 ha-config/.cache
+ha-config/.HA_VERSION
 ha-config/.storage/
 ha-config/blueprints/
 ha-config/home-assistant.log*
