@@ -20,7 +20,7 @@ type LissyConfigEntry = ConfigEntry[LissyCoordinator]
 
 class LissyCoordinator(DataUpdateCoordinator[list[LoanItem]]):
     def __init__(
-        self, hass: HomeAssistant, client: LissyClient, entry: ConfigEntry
+        self, hass: HomeAssistant, client: LissyClient, entry: LissyConfigEntry
     ) -> None:
         super().__init__(
             hass,
