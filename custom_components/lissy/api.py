@@ -7,7 +7,7 @@ import logging
 import re
 from datetime import date
 from enum import StrEnum
-from typing import Any, NotRequired, TypedDict
+from typing import Any, AsyncContextManager, NotRequired, TypedDict
 from urllib.parse import urljoin
 
 import aiohttp
@@ -257,7 +257,7 @@ class LissyClient:
                 result.append(_CheckboxInput(name=str(name), value=str(value)))
         return result
 
-    async def _get_session(self):
+    async def _get_session(self) -> AsyncContextManager[aiohttp.ClientSession]:
         """Return a context manager yielding an aiohttp session."""
         if self._shared_session is not None:
             # Shared session must not be closed — wrap in a no-op CM.
