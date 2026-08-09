@@ -98,8 +98,9 @@ class LissyNextDueSensor(_LissyBase):
         super().__init__(coordinator, entry)
         self._attr_unique_id = f"{entry.entry_id}_next_due"
         self._attr_name = "Next Due"
+        self._cached_earliest = self._compute_earliest()
 
-    def _earliest(self) -> tuple[date, LoanItem] | None:
+    def _compute_earliest(self) -> tuple[date, LoanItem] | None:
         dated = [
             (due_date, m)
             for m in (self.coordinator.data or [])
@@ -107,14 +108,18 @@ class LissyNextDueSensor(_LissyBase):
         ]
         return min(dated, key=lambda x: x[0]) if dated else None
 
+    def _handle_coordinator_update(self) -> None:
+        self._cached_earliest = self._compute_earliest()
+        super()._handle_coordinator_update()
+
     @property
     def native_value(self) -> date | None:
-        earliest = self._earliest()
+        earliest = self._cached_earliest
         return earliest[0] if earliest else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        earliest = self._earliest()
+        earliest = self._cached_earliest
         if not earliest:
             return {}
         due, item = earliest

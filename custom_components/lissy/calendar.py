@@ -32,9 +32,10 @@ class LissyCalendar(LissyEntity, CalendarEntity):
     def __init__(self, coordinator: LissyCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator, entry)
         self._attr_unique_id = f"{entry.entry_id}_calendar"
+        self._cached_events = self._all_events()
 
     def _all_events(self) -> list[CalendarEvent]:
-        events = []
+        events: list[CalendarEvent] = []
         for item in self.coordinator.data or []:
             due_date = parse_leihfrist(item["due_date"])
             if due_date:
@@ -49,18 +50,21 @@ class LissyCalendar(LissyEntity, CalendarEntity):
                 )
         return events
 
+    def _handle_coordinator_update(self) -> None:
+        self._cached_events = self._all_events()
+        super()._handle_coordinator_update()
+
     @property
     def event(self) -> CalendarEvent | None:
-        events = self._all_events()
-        if not events:
+        if not self._cached_events:
             return None
-        return min(events, key=lambda e: e.start)
+        return min(self._cached_events, key=lambda e: e.start)
 
     async def async_get_events(
         self, hass: HomeAssistant, start_date: datetime, end_date: datetime
     ) -> list[CalendarEvent]:
         return [
             e
-            for e in self._all_events()
+            for e in self._cached_events
             if start_date.date() <= e.start <= end_date.date()
         ]
