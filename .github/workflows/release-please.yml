@@ -25,6 +25,21 @@ jobs:
         run: cd custom_components/lissy && zip -r $GITHUB_WORKSPACE/lissy.zip . -x '*.pyc' -x '*/__pycache__/*' -x './.*'
 
       - if: ${{ steps.release.outputs.release_created }}
+        name: Verify zip layout
+        run: |
+          set -euo pipefail
+          echo "=== zip contents ==="
+          unzip -Z1 lissy.zip | sort
+          bad=$(unzip -Z1 lissy.zip | grep -E '^(lissy/|custom_components/)' || true)
+          if [ -n "$bad" ]; then
+            echo "ERROR: entries have unexpected top-level prefix:" >&2
+            echo "$bad" >&2
+            exit 1
+          fi
+          unzip -Z1 lissy.zip | grep -qx "manifest.json" || { echo "ERROR: manifest.json missing from zip root" >&2; exit 1; }
+          echo "zip layout OK"
+
+      - if: ${{ steps.release.outputs.release_created }}
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.release.outputs.tag_name }}
