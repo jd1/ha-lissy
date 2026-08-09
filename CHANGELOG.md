@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/jd1/ha-lissy/compare/v0.5.0...v0.5.1) (2026-08-09)
+
+
+### Bug Fixes
+
+* **ci:** Remove custom_component folder from zip release ([db5950d](https://github.com/jd1/ha-lissy/commit/db5950dfffa9d700bdb2a89e93586a2e2a0bca1d))
+
 ## [0.5.0](https://github.com/jd1/ha-lissy/compare/v0.4.0...v0.5.0) (2026-08-09)
 
 
