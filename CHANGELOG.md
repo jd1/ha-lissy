@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/jd1/ha-lissy/compare/v0.5.2...v0.5.3) (2026-08-09)
+
+
+### Bug Fixes
+
+* **ci:** zip lissy contents flat for HACS zip_release extraction ([1be8ddf](https://github.com/jd1/ha-lissy/commit/1be8ddf9dd4259f0f85e7bab5e4e6dd830159df0))
+
 ## [0.5.2](https://github.com/jd1/ha-lissy/compare/v0.5.1...v0.5.2) (2026-08-09)
 
 
