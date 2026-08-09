@@ -22,7 +22,7 @@ jobs:
 
       - if: ${{ steps.release.outputs.release_created }}
         name: Build zip
-        run: cd custom_components && zip -r $GITHUB_WORKSPACE/lissy.zip lissy -x '*.pyc' -x '*/__pycache__/*'
+        run: cd custom_components/lissy && zip -r $GITHUB_WORKSPACE/lissy.zip lissy -x '*.pyc' -x '*/__pycache__/*'
 
       - if: ${{ steps.release.outputs.release_created }}
         uses: softprops/action-gh-release@v3
