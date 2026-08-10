@@ -277,6 +277,23 @@ async def test_migrate_entry_already_current_version(hass):
     assert entry.data["base_url"] == "http://x"
 
 
+async def test_migrate_entry_rejects_future_version(hass):
+    """An entry newer than the current schema is rejected, not silently kept."""
+    from custom_components.lissy import async_migrate_entry
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="12345",
+        title="Lissy (12345)",
+        data={"username": "12345", "password": "secret", "base_url": "http://x"},
+        version=3,
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry) is False
+    assert entry.version == 3
+
+
 async def test_renew_device_without_setup_is_noop(hass):
     """Targeting a device whose config entry isn't set up doesn't crash."""
     from homeassistant.helpers import device_registry as dr

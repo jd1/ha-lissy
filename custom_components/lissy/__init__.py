@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -19,17 +21,48 @@ from .coordinator import LissyConfigEntry, LissyCoordinator
 PLATFORMS = [Platform.SENSOR, Platform.CALENDAR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
+_LOGGER = logging.getLogger(__name__)
+
 
 async def async_migrate_entry(hass: HomeAssistant, entry: LissyConfigEntry) -> bool:
-    """Migrate old config entries to the current schema."""
-    if entry.version == 1:
-        new_data = {**entry.data}
+    """Migrate old config entries to the current schema.
+
+    Walks the entry forward one version at a time so already-migrated
+    entries skip the steps they've already absorbed, and a fresh v1
+    entry walks the whole chain. A final assertion guards against
+    unexpected versions (e.g. a downgrade from a newer schema).
+    """
+    from .config_flow import LissyConfigFlow
+
+    current_version = LissyConfigFlow.VERSION
+    new_data = {**entry.data}
+    version = entry.version
+
+    if version == 1:
         # TODO: remove this backfill once all entries have migrated past
         # version 1 (no more users on the old default base_url).
         new_data.setdefault(
             "base_url", "https://stb.schwaebisch-gmuend.de/lissy/lissy.ly"
         )
-        hass.config_entries.async_update_entry(entry, data=new_data, version=2)
+        version = 2
+    # Chain future migrations here as sequential ``if version == N:`` blocks,
+    # each bumping ``version`` to the next integer, e.g.:
+    #   if version == 2:
+    #       ... transform new_data ...
+    #       version = 3
+
+    if version != current_version:
+        _LOGGER.error(
+            "Cannot migrate config entry: ended at version %s, "
+            "expected %s (entry %s started at %s)",
+            version,
+            current_version,
+            entry.entry_id,
+            entry.version,
+        )
+        return False
+
+    hass.config_entries.async_update_entry(entry, data=new_data, version=version)
     return True
 
 
