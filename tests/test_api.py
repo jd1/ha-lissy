@@ -275,7 +275,6 @@ def test_parse_checkboxes_empty():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_login_success():
     client = LissyClient("user123", "pass456", "http://x/lissy/lissy.ly")
     session = MagicMock()
@@ -288,7 +287,6 @@ async def test_login_success():
     assert session.post.call_args.args[0] == "http://x/lissy/lissy.ly"
 
 
-@pytest.mark.asyncio
 async def test_login_bad_credentials_raises_auth_error():
     client = LissyClient("user123", "wrongpass", "http://x/lissy/lissy.ly")
     session = MagicMock()
@@ -299,7 +297,6 @@ async def test_login_bad_credentials_raises_auth_error():
         await client._login(session)
 
 
-@pytest.mark.asyncio
 async def test_login_no_token_raises_auth_error():
     """A response without a c= token at all is a login failure, not success."""
     client = LissyClient("user123", "wrongpass", "http://x/lissy/lissy.ly")
@@ -311,7 +308,6 @@ async def test_login_no_token_raises_auth_error():
         await client._login(session)
 
 
-@pytest.mark.asyncio
 async def test_login_malformed_page_raises_connection_error():
     client = LissyClient("user123", "pass456", "http://x/lissy/lissy.ly")
     session = MagicMock()
@@ -323,7 +319,6 @@ async def test_login_malformed_page_raises_connection_error():
         await client._login(session)
 
 
-@pytest.mark.asyncio
 async def test_login_network_error_raises_connection_error():
     import aiohttp
 
@@ -346,7 +341,6 @@ async def test_login_network_error_raises_connection_error():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_list_loans():
     client = LissyClient("user123", "pass456", "http://x/lissy/lissy.ly")
     # login GET, login POST, topframe GET, entl GET
@@ -369,7 +363,6 @@ async def test_list_loans():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_renew_all():
     client = LissyClient("user123", "pass456", "http://x/lissy/lissy.ly")
     # login GET, login POST, topframe GET, entl GET (checkboxes),
@@ -393,7 +386,6 @@ async def test_renew_all():
     assert len(result["list"]) == 4
 
 
-@pytest.mark.asyncio
 async def test_renew_target_mednr():
     client = LissyClient("user123", "pass456", "http://x/lissy/lissy.ly")
     mock_session = _make_session(
@@ -412,7 +404,6 @@ async def test_renew_target_mednr():
     assert len(result["renewed"]) == 1
 
 
-@pytest.mark.asyncio
 async def test_renew_unknown_mednr_raises():
     client = LissyClient("user123", "pass456", "http://x/lissy/lissy.ly")
     mock_session = _make_session(
@@ -426,7 +417,6 @@ async def test_renew_unknown_mednr_raises():
             await client.renew(targets={"99999999"})
 
 
-@pytest.mark.asyncio
 async def test_renew_no_media_returns_empty():
     client = LissyClient("user123", "pass456", "http://x/lissy/lissy.ly")
     mock_session = _make_session(
@@ -441,7 +431,6 @@ async def test_renew_no_media_returns_empty():
     assert result == {"renewed": [], "list": []}
 
 
-@pytest.mark.asyncio
 async def test_renew_no_result_table_reports_failure():
     """Tableless renewal response is reported as failure, not silent success."""
     client = LissyClient("user123", "pass456", "http://x/lissy/lissy.ly")
@@ -462,7 +451,6 @@ async def test_renew_no_result_table_reports_failure():
     assert all(r["reason"] == "no response table" for r in result["renewed"])
 
 
-@pytest.mark.asyncio
 async def test_renew_tableless_skips_second_entl_fetch():
     """When no result table is returned, the loans list is reused instead
     of triggering a second _entl_html page load."""
@@ -493,7 +481,6 @@ async def test_renew_tableless_skips_second_entl_fetch():
     assert len(result["list"]) == 4
 
 
-@pytest.mark.asyncio
 async def test_renew_multiple_targets_posts_all():
     """H1: targeting several mednrs renews all of them in one login."""
     client = LissyClient("user123", "pass456", "http://x/lissy/lissy.ly")
