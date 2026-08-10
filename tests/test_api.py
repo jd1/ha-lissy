@@ -8,7 +8,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from contextlib import asynccontextmanager
 
-from api import (
+from custom_components.lissy.api import (
     LissyAuthError,
     LissyClient,
     LissyConnectionError,
@@ -213,7 +213,7 @@ def test_parse_rows_unknown_media_type_logs_warning(caplog):
     """Unknown media-type icons are logged at WARNING, not ERROR."""
     _WARNED_TYPES.clear()
     html = LOANS_HTML.replace("buch.gif", "unbekannt.gif")
-    with caplog.at_level(logging.WARNING, logger="api"):
+    with caplog.at_level(logging.WARNING, logger="custom_components.lissy.api"):
         LissyClient._parse_rows(html)
     assert any(
         r.levelno == logging.WARNING and "unbekannt" in r.message
@@ -228,7 +228,7 @@ def test_parse_rows_unknown_media_type_deduplicated(caplog):
     html = LOANS_HTML.replace("dvd.gif", "unbekannt.gif").replace(
         "spiel.gif", "unbekannt.gif"
     )
-    with caplog.at_level(logging.WARNING, logger="api"):
+    with caplog.at_level(logging.WARNING, logger="custom_components.lissy.api"):
         LissyClient._parse_rows(html)
     warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
     assert len(warnings) == 1
@@ -239,7 +239,7 @@ def test_parse_rows_different_unknown_types_both_warned(caplog):
     """Dedup is per type — distinct unknown icons each log once."""
     _WARNED_TYPES.clear()
     html = LOANS_HTML.replace("dvd.gif", "typa.gif").replace("spiel.gif", "typb.gif")
-    with caplog.at_level(logging.WARNING, logger="api"):
+    with caplog.at_level(logging.WARNING, logger="custom_components.lissy.api"):
         LissyClient._parse_rows(html)
     messages = [r.message for r in caplog.records if r.levelno == logging.WARNING]
     assert len(messages) == 2
