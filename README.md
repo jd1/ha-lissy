@@ -47,7 +47,12 @@ Renews borrowed items.
 
 ## Automatic renewal
 
-Copy `blueprints/automation/lissy_auto_renew.yaml` from this repository into your HA `config/blueprints/automation/` folder, then go to **Settings → Automations → Blueprints** and create an automation from **Lissy — Auto-renew loans**.
+Import the blueprint
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fjd1%2Fha-lissy%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2Flissy_auto_renew.yaml)
+
+or copy `blueprints/automation/lissy_auto_renew.yaml` from this repository into your HA `config/blueprints/automation/` folder.
+
+Go to **Settings → Automations → Blueprints** and create an automation from **Lissy — Auto-renew loans**.
 
 The blueprint runs daily at a configurable time and calls `lissy.renew` only when at least one item is due within the configured number of days (default: 3). It uses the `days_until_due` attribute exposed by each item sensor.
 
