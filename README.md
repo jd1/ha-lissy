@@ -11,6 +11,7 @@ Tracks borrowed items from a Lissy-based public library system.
 - **Sensors** for each borrowed item (state = due date)
 - **Summary sensors**: total borrowed count, next due date
 - **Calendar** entity with all loan deadlines
+- **Renewal count** per item — a `renewals` attribute on each item and summary sensor, incremented whenever the due date moves (via this integration or externally)
 - **Service** `lissy.renew` to renew items directly from HA
 
 ## Installation via HACS

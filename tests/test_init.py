@@ -102,6 +102,44 @@ async def test_next_due_sensor_days_until_due(hass):
     assert isinstance(days, int)
 
 
+async def test_item_sensor_reports_renewals_attribute(hass):
+    """Each item sensor surfaces a `renewals` count (zero for a fresh loan)."""
+    await _setup(hass)
+    state = hass.states.get("sensor.lissy_12345_book_one")
+    assert state.attributes.get("renewals") == 0
+    # the aggregate summary also carries the per-item renewals
+    summary = hass.states.get("sensor.lissy_12345_borrowed")
+    items = summary.attributes.get("items")
+    assert items and all("renewals" in i for i in items)
+
+
+async def test_renew_increments_renewal_count(hass):
+    """The renew service pushes the fresh loan list, which counts the renewal."""
+    renewed_list = [{**LOANS[0], "due_date": "30.07.2026"}]
+    renew = AsyncMock(
+        return_value={
+            "renewed": [{"media_id": "111", "renewed": True, "reason": ""}],
+            "list": renewed_list,
+        }
+    )
+    entry, _ = await _setup(hass, renew=renew)
+    coordinator = entry.runtime_data
+    assert coordinator.renewal_count("111") == 0
+
+    await hass.services.async_call(
+        DOMAIN,
+        "renew",
+        {"entity_id": "sensor.lissy_12345_book_one"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    assert coordinator.renewal_count("111") == 1
+    assert (
+        hass.states.get("sensor.lissy_12345_book_one").attributes.get("renewals") == 1
+    )
+
+
 async def test_renew_all_via_device(hass):
     """Targeting the Lissy device renews all loans (targets=None)."""
     from homeassistant.helpers import device_registry as dev_reg_helper

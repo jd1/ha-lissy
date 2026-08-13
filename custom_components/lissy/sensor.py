@@ -83,7 +83,12 @@ class LissyCountSensor(_LissyBase):
     def extra_state_attributes(self) -> dict[str, Any]:
         return {
             "items": [
-                {"media_id": m["media_id"], "title": m["title"], "due": m["due_date"]}
+                {
+                    "media_id": m["media_id"],
+                    "title": m["title"],
+                    "due": m["due_date"],
+                    "renewals": self.coordinator.renewal_count(m["media_id"]),
+                }
                 for m in (self.coordinator.data or [])
             ]
         }
@@ -128,6 +133,7 @@ class LissyNextDueSensor(_LissyBase):
             "title": item["title"],
             "type": item["media_type"],
             "days_until_due": (due - dt_util.now().date()).days,
+            "renewals": self.coordinator.renewal_count(item["media_id"]),
         }
 
 
@@ -185,6 +191,7 @@ class LissyItemSensor(_LissyBase):
             "media_type": item["media_type"],
             "note": item["note"],
             "days_until_due": (due - dt_util.now().date()).days if due else None,
+            "renewals": self.coordinator.renewal_count(item["media_id"]),
         }
 
 
