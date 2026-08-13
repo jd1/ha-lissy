@@ -16,4 +16,7 @@ ha-config/.ha_run.lock
 ha-config/tts/
 ha-config/tmp/
 ha-config/*.secret
+ha-config/scenes.yaml
+ha-config/scripts.yaml
+ha-config/secrets.yaml
 TODO.md
