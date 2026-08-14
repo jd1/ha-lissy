@@ -1,0 +1,67 @@
+name: opencode issue to PR
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  opencode-issue-to-pr:
+    if: |
+      !github.event.issue.pull_request &&
+      contains(github.event.issue.labels.*.name, 'ai-pr') &&
+      github.event.sender.login == 'jd1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build opencode prompt
+        id: prompt
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          prompt=$(cat <<'EOF'
+          Implement the changes requested in GitHub issue #ISSUE_NUMBER.
+
+          Title: ISSUE_TITLE
+
+          Body:
+          ISSUE_BODY
+
+          Instructions:
+          - Work in this repository to implement the requested feature or fix.
+          - Follow the existing code style and project conventions described in AGENTS.md.
+          - Run the verification commands from AGENTS.md (black --check ., mypy custom_components/lissy --ignore-missing-imports, pytest -q, bandit -r custom_components/ -ll) and ensure they pass before finishing.
+          - Create a new branch, commit the changes with a conventional commit message, and open a pull request that references issue #ISSUE_NUMBER.
+          - Do not push directly to the default branch.
+          EOF
+          )
+          prompt="${prompt//ISSUE_NUMBER/$ISSUE_NUMBER}"
+          prompt="${prompt//ISSUE_TITLE/$ISSUE_TITLE}"
+          prompt="${prompt//ISSUE_BODY/$ISSUE_BODY}"
+          {
+            echo "text<<OPENCODE_PROMPT"
+            echo "$prompt"
+            echo "OPENCODE_PROMPT"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run opencode
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENAI_API_KEY: ${{ secrets.HETZNER_API_KEY }}
+          OPENAI_BASE_URL: https://inference.hetzner.com/api/v1
+        with:
+          model: GLM-5.2-NVFP4
+          prompt: ${{ steps.prompt.outputs.text }}
+          agent: build
+        timeout-minutes: 30
