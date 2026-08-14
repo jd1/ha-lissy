@@ -11,6 +11,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import dt as dt_util
 
 from .api import LoanItem, MediaType, parse_leihfrist
@@ -131,7 +132,7 @@ class LissyNextDueSensor(_LissyBase):
         }
 
 
-class LissyItemSensor(_LissyBase):
+class LissyItemSensor(_LissyBase, RestoreEntity):
     """One sensor per borrowed item. State = due date, available = still on loan."""
 
     _attr_device_class = SensorDeviceClass.DATE
@@ -142,6 +143,23 @@ class LissyItemSensor(_LissyBase):
         super().__init__(coordinator, entry)
         self._media_id = item["media_id"]
         self._attr_unique_id = f"{entry.entry_id}{ITEM_ID_SEP}{self._media_id}"
+        self._restored_due_date: date | None = None
+        self._restored_name: str | None = None
+        self._restored_attributes: dict[str, Any] | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (state := await self.async_get_last_state()) is not None:
+            try:
+                self._restored_due_date = date.fromisoformat(state.state)
+            except ValueError:
+                self._restored_due_date = None
+            self._restored_name = state.attributes.get("friendly_name")
+            self._restored_attributes = {
+                key: value
+                for key, value in state.attributes.items()
+                if key not in ("device_class", "friendly_name")
+            }
 
     def _item(self) -> LoanItem | None:
         return next(
@@ -155,37 +173,46 @@ class LissyItemSensor(_LissyBase):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and self._item() is not None
+        if self._item() is not None:
+            return True
+        return (
+            self._restored_due_date is not None
+            and not self.coordinator.last_update_success
+        )
 
     @property
     def name(self) -> str | None:
         if item := self._item():
             return item["title"]
-        return None
+        return self._restored_name
 
     @property
     def icon(self) -> str:
         if item := self._item():
             return _icon_for_type(item["media_type"])
+        if self._restored_attributes:
+            return _icon_for_type(
+                self._restored_attributes.get("media_type")  # type: ignore[arg-type]
+            )
         return "mdi:library"
 
     @property
     def native_value(self) -> date | None:
-        if not (item := self._item()):
-            return None
-        return parse_leihfrist(item["due_date"])
+        if item := self._item():
+            return parse_leihfrist(item["due_date"])
+        return self._restored_due_date
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        if not (item := self._item()):
-            return {}
-        due = parse_leihfrist(item["due_date"])
-        return {
-            "media_id": item["media_id"],
-            "media_type": item["media_type"],
-            "note": item["note"],
-            "days_until_due": (due - dt_util.now().date()).days if due else None,
-        }
+        if item := self._item():
+            due = parse_leihfrist(item["due_date"])
+            return {
+                "media_id": item["media_id"],
+                "media_type": item["media_type"],
+                "note": item["note"],
+                "days_until_due": (due - dt_util.now().date()).days if due else None,
+            }
+        return self._restored_attributes or {}
 
 
 def _icon_for_type(media_type: MediaType) -> str:
