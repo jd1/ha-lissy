@@ -142,3 +142,24 @@ async def test_renewal_count_persists_across_coordinator_instances(hass: HomeAss
     await coord2._async_update_data()
     # persisted count (1) + the change detected after restart
     assert coord2.renewal_count("111") == 2
+
+
+async def test_storage_load_failure_does_not_pin_loaded_flag(hass: HomeAssistant):
+    """If async_load() raises, the loaded flag must stay false so the next
+    update retries the load instead of silently using empty dicts."""
+    coord = _coordinator(hass, AsyncMock(return_value=list(LOANS)))
+    coord._store.async_load = AsyncMock(
+        side_effect=[
+            RuntimeError("storage unavailable"),
+            {"due_dates": {"111": "01.01.2026"}, "renewal_counts": {"111": 7}},
+        ]
+    )
+
+    with pytest.raises(RuntimeError):
+        await coord._async_load_storage()
+    assert coord._storage_loaded is False
+    assert coord.renewal_count("111") == 0
+
+    await coord._async_load_storage()
+    assert coord._storage_loaded is True
+    assert coord.renewal_count("111") == 7

@@ -53,11 +53,11 @@ class LissyCoordinator(DataUpdateCoordinator[list[LoanItem]]):
     async def _async_load_storage(self) -> None:
         if self._storage_loaded:
             return
-        self._storage_loaded = True
         data: dict[str, Any] | None = await self._store.async_load()
         if data:
             self._due_dates = data.get("due_dates", {})
             self._renewal_counts = data.get("renewal_counts", {})
+        self._storage_loaded = True
 
     async def _async_persist(self) -> None:
         await self._store.async_save(
