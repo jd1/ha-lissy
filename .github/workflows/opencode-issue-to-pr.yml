@@ -58,10 +58,9 @@ jobs:
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
         env:
-          OPENAI_API_KEY: ${{ secrets.HETZNER_API_KEY }}
-          OPENAI_BASE_URL: https://inference.hetzner.com/api/v1
+          HETZNER_API_KEY: ${{ secrets.HETZNER_API_KEY }}
         with:
-          model: openai/Kimi-K2.7-Code
+          model: hetzner/Kimi-K2.7-Code
           prompt: ${{ steps.prompt.outputs.text }}
           agent: build
         timeout-minutes: 30
