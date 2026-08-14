@@ -2,13 +2,13 @@ name: opencode issue to PR
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [labeled]
 
 jobs:
   opencode-issue-to-pr:
     if: |
       !github.event.issue.pull_request &&
-      contains(github.event.issue.labels.*.name, 'ai-pr') &&
+      github.event.label.name == 'ai-pr' &&
       github.event.sender.login == 'jd1'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -61,7 +61,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.HETZNER_API_KEY }}
           OPENAI_BASE_URL: https://inference.hetzner.com/api/v1
         with:
-          model: GLM-5.2-NVFP4
+          model: hetzner/Kimi-K2.7-Code
           prompt: ${{ steps.prompt.outputs.text }}
           agent: build
         timeout-minutes: 30
