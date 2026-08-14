@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0](https://github.com/jd1/ha-lissy/compare/v0.5.3...v0.6.0) (2026-08-14)
+
+
+### Features
+
+* **ci:** add opencode workflow to convert ai-pr issues into prs ([493bf9b](https://github.com/jd1/ha-lissy/commit/493bf9bc81d022133f640856287891d0899a0321))
+
+
+### Bug Fixes
+
+* **ci:** avoid duplicate runs and use valid hetzner model format ([b5f7b5c](https://github.com/jd1/ha-lissy/commit/b5f7b5c70f1fa0902fa0c82bd756c998f6db7d97))
+* **ci:** register hetzner as custom opencode provider ([c74b92f](https://github.com/jd1/ha-lissy/commit/c74b92f4ba22649f3696d36e7538947a6f807831))
+* **ci:** Use different model prefix ([0d0ba0a](https://github.com/jd1/ha-lissy/commit/0d0ba0a78ec2b4eac8c8d24de1a517753ef9c8ac))
+* **lissy:** chain config-entry migration and assert final version ([55590b5](https://github.com/jd1/ha-lissy/commit/55590b51aeb9da5671727e8639114980a59f320f))
+
 ## [0.5.3](https://github.com/jd1/ha-lissy/compare/v0.5.2...v0.5.3) (2026-08-09)
 
 
