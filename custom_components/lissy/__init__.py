@@ -149,6 +149,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: LissyConfigEntry) -> boo
         session=async_get_clientsession(hass),
     )
     coordinator = LissyCoordinator(hass, client, entry)
+
+    # Seed coordinator.data from the persisted snapshot so the first
+    # post-restart poll has a previous loan list to compare against: a
+    # redundant snapshot write is skipped when nothing changed, and the
+    # upcoming renewal-count feature can detect renewals that happened while
+    # HA was offline by diffing the fresh poll against this snapshot.
+    snapshot = await coordinator.async_load_snapshot()
+    if snapshot is not None:
+        coordinator.async_set_restored_data(snapshot)
+
     await coordinator.async_config_entry_first_refresh()
 
     entry.runtime_data = coordinator
@@ -158,4 +168,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: LissyConfigEntry) -> boo
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: LissyConfigEntry) -> bool:
+    # LissyCoordinator.async_shutdown (which cancels the in-flight snapshot
+    # persist task and tears down the base refresh scheduling) is registered
+    # via config_entry.async_on_unload by DataUpdateCoordinator and runs
+    # automatically once async_unload_platforms succeeds.
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
