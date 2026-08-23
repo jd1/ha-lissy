@@ -127,13 +127,24 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             except LissyConnectionError as e:
                 raise HomeAssistantError(f"Renew failed: {e}") from e
             # renew() already fetched the fresh loan list — reuse it instead of
-            # triggering a second full login + scrape.
-            coordinator.async_set_updated_data(result["list"])
-            failed = [r for r in result["renewed"] if not r["renewed"]]
+            # triggering a second full login + scrape. Annotation embeds the
+            # authoritative renewal results before the state update dispatches,
+            # so listeners never see stale counts.
+            counted = coordinator.async_record_renewals(
+                result["renewed"], result["list"]
+            )
+            coordinator.async_set_updated_data(counted)
+            failed = [
+                attempt for attempt in result["renewed"] if not attempt["renewed"]
+            ]
             if failed:
                 reasons = "; ".join(
-                    f"{r['media_id']}: {r['reason']}" if r["reason"] else r["media_id"]
-                    for r in failed
+                    (
+                        f"{attempt['media_id']}: {attempt['reason']}"
+                        if attempt["reason"]
+                        else attempt["media_id"]
+                    )
+                    for attempt in failed
                 )
                 raise HomeAssistantError(f"Renewal failed: {reasons}")
 
