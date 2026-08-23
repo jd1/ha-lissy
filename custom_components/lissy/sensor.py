@@ -15,7 +15,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import LoanItem, MediaType, parse_leihfrist
 from .const import DOMAIN, ITEM_ID_SEP
-from .coordinator import LissyConfigEntry, LissyCoordinator
+from .coordinator import CountedLoan, LissyConfigEntry, LissyCoordinator
 from .entity import LissyEntity
 
 PARALLEL_UPDATES = 0
@@ -83,8 +83,13 @@ class LissyCountSensor(_LissyBase):
     def extra_state_attributes(self) -> dict[str, Any]:
         return {
             "items": [
-                {"media_id": m["media_id"], "title": m["title"], "due": m["due_date"]}
-                for m in (self.coordinator.data or [])
+                {
+                    "media_id": item["media_id"],
+                    "title": item["title"],
+                    "due": item["due_date"],
+                    "renewals": item.get("renewals", 0),
+                }
+                for item in (self.coordinator.data or [])
             ]
         }
 
@@ -100,13 +105,13 @@ class LissyNextDueSensor(_LissyBase):
         self._attr_name = "Next Due"
         self._cached_earliest = self._compute_earliest()
 
-    def _compute_earliest(self) -> tuple[date, LoanItem] | None:
+    def _compute_earliest(self) -> tuple[date, CountedLoan] | None:
         dated = [
-            (due_date, m)
-            for m in (self.coordinator.data or [])
-            if (due_date := parse_leihfrist(m["due_date"])) is not None
+            (due_date, item)
+            for item in (self.coordinator.data or [])
+            if (due_date := parse_leihfrist(item["due_date"])) is not None
         ]
-        return min(dated, key=lambda x: x[0]) if dated else None
+        return min(dated, key=lambda entry: entry[0]) if dated else None
 
     def _handle_coordinator_update(self) -> None:
         self._cached_earliest = self._compute_earliest()
@@ -128,6 +133,7 @@ class LissyNextDueSensor(_LissyBase):
             "title": item["title"],
             "type": item["media_type"],
             "days_until_due": (due - dt_util.now().date()).days,
+            "renewals": item.get("renewals", 0),
         }
 
 
@@ -143,12 +149,12 @@ class LissyItemSensor(_LissyBase):
         self._media_id = item["media_id"]
         self._attr_unique_id = f"{entry.entry_id}{ITEM_ID_SEP}{self._media_id}"
 
-    def _item(self) -> LoanItem | None:
+    def _item(self) -> CountedLoan | None:
         return next(
             (
-                m
-                for m in (self.coordinator.data or [])
-                if m["media_id"] == self._media_id
+                item
+                for item in (self.coordinator.data or [])
+                if item["media_id"] == self._media_id
             ),
             None,
         )
@@ -185,6 +191,7 @@ class LissyItemSensor(_LissyBase):
             "media_type": item["media_type"],
             "note": item["note"],
             "days_until_due": (due - dt_util.now().date()).days if due else None,
+            "renewals": item.get("renewals", 0),
         }
 
 

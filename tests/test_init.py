@@ -231,6 +231,32 @@ async def test_renew_failure_surfaces_as_error(hass):
         )
 
 
+async def test_renew_service_exposes_renewal_count_on_sensors(hass):
+    """A successful renew bumps `renewals` on the item and summary sensors."""
+    moved = AsyncMock(
+        return_value={
+            "renewed": [{"media_id": "111", "renewed": True, "reason": ""}],
+            "list": [{**LOANS[0], "due_date": "15.07.2026"}, LOANS[1]],
+        }
+    )
+    await _setup(hass, renew=moved)
+
+    await hass.services.async_call(
+        DOMAIN,
+        "renew",
+        {"entity_id": "sensor.lissy_12345_book_one"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    item_attrs = hass.states.get("sensor.lissy_12345_book_one").attributes
+    assert item_attrs["renewals"] == 1
+
+    items = hass.states.get("sensor.lissy_12345_borrowed").attributes["items"]
+    renewals_by_id = {item["media_id"]: item["renewals"] for item in items}
+    assert renewals_by_id == {"111": 1, "222": 0}
+
+
 async def test_unload_entry(hass):
     """Unloading an entry tears down platforms and clears runtime_data."""
     entry, _ = await _setup(hass)
