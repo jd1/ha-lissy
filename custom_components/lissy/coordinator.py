@@ -118,11 +118,15 @@ class LissyCoordinator(DataUpdateCoordinator[list[CountedLoan]]):
 
         Counts carry over from ``self.data``. A count increments when the
         media ID is in ``renewed_ids`` (authoritative renew-service results)
-        or — for everything else — when its parsed due date moved relative
-        to ``self.data`` (polls, and external website renewals surfacing in
-        a renew response). Comparing parsed dates rather than raw strings
-        keeps format drift such as ``30.6.2026`` vs ``30.06.2026`` from
-        counting as a renewal.
+        or — for everything else — when its parsed due date moved *forward*
+        relative to ``self.data`` (polls, and external website renewals
+        surfacing in a renew response). Renewals extend dates, so only a
+        later date counts: a backward move indicates stale data — e.g. a
+        poll scraped seconds before a concurrent renew landed — and must
+        not inflate the count. Comparing parsed dates rather than raw
+        strings keeps format drift such as ``30.6.2026`` vs ``30.06.2026``
+        from counting as a renewal; dates that fail to parse are likewise
+        never treated as movement.
         """
         prev_data = self.data or []
         prev_counts = {loan["media_id"]: loan.get("renewals", 0) for loan in prev_data}
@@ -134,10 +138,15 @@ class LissyCoordinator(DataUpdateCoordinator[list[CountedLoan]]):
             count = prev_counts.get(media_id, 0)
             if renewed_ids is not None and media_id in renewed_ids:
                 count += 1
-            elif old_due is not None and parse_leihfrist(old_due) != parse_leihfrist(
-                item["due_date"]
-            ):
-                count += 1
+            elif old_due is not None:
+                old_parsed = parse_leihfrist(old_due)
+                new_parsed = parse_leihfrist(item["due_date"])
+                if (
+                    old_parsed is not None
+                    and new_parsed is not None
+                    and new_parsed > old_parsed
+                ):
+                    count += 1
             counted.append({**item, "renewals": count})
         return counted
 
@@ -176,8 +185,8 @@ class LissyCoordinator(DataUpdateCoordinator[list[CountedLoan]]):
 
         Returns the counted list; push it with
         :meth:`async_set_updated_data` so listeners see the incremented
-        counts. Items outside this renewal whose due date still moved are
-        counted by the same heuristic as polls, catching renewals done
+        counts. Items outside this renewal whose due date moved forward
+        are counted by the same heuristic as polls, catching renewals done
         externally on the library's website.
         """
         return self._annotate(
