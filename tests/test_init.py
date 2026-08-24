@@ -320,8 +320,8 @@ async def test_migrate_entry_rejects_future_version(hass):
     assert entry.version == 3
 
 
-async def test_renew_device_without_setup_is_noop(hass):
-    """Targeting a device whose config entry isn't set up doesn't crash."""
+async def test_renew_device_without_setup_is_validation_error(hass):
+    """Targeting a device whose config entry isn't set up fails loudly."""
     from homeassistant.helpers import device_registry as dr
 
     # Set up one working entry so the renew service is registered.
@@ -342,7 +342,66 @@ async def test_renew_device_without_setup_is_noop(hass):
         identifiers={(DOMAIN, entry2.entry_id)},
     )
 
-    await hass.services.async_call(
-        DOMAIN, "renew", {}, target={"device_id": device.id}, blocking=True
-    )
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN, "renew", {}, target={"device_id": device.id}, blocking=True
+        )
     client.renew.assert_not_awaited()
+
+
+async def test_renew_unknown_entity_is_validation_error(hass):
+    """A stale entity_id (gone from the registry) fails loudly, not silently."""
+    _, client = await _setup(hass)
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            "renew",
+            {"entity_id": "sensor.removed_long_ago"},
+            blocking=True,
+        )
+    client.renew.assert_not_awaited()
+
+
+async def test_renew_entity_of_unloaded_entry_is_validation_error(hass):
+    """An item-sensor entity backed by an unsetup entry fails loudly."""
+    _, client = await _setup(hass)
+
+    entry2 = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="99999",
+        title="Lissy (99999)",
+        data={"username": "99999", "password": "secret", "base_url": "http://x"},
+    )
+    entry2.add_to_hass(hass)
+    reg = er.async_get(hass)
+    reg.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{entry2.entry_id}_item_111",
+        config_entry=entry2,
+        suggested_object_id="lissy_99999_book_one",
+    )
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            "renew",
+            {"entity_id": "sensor.lissy_99999_book_one"},
+            blocking=True,
+        )
+    client.renew.assert_not_awaited()
+
+
+async def test_renew_mixed_stale_and_valid_entities_renews_valid_ones(hass):
+    """Partially resolvable input renews what resolved instead of failing."""
+    _, client = await _setup(hass)
+
+    await hass.services.async_call(
+        DOMAIN,
+        "renew",
+        {"entity_id": ["sensor.lissy_12345_book_one", "sensor.removed_long_ago"]},
+        blocking=True,
+    )
+
+    client.renew.assert_awaited_once_with({"111"})
