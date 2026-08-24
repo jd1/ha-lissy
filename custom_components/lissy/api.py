@@ -130,7 +130,9 @@ class LissyClient:
 
     async def _login(self, session: aiohttp.ClientSession) -> str:
         try:
-            async with session.get(self._base_url, params={"pg": "bnrlogin"}) as r:
+            async with session.get(
+                self._base_url, params={"pg": "bnrlogin"}, timeout=_TIMEOUT
+            ) as r:
                 r.raise_for_status()
                 text = await r.text(encoding="latin-1")
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
@@ -160,6 +162,7 @@ class LissyClient:
                     "gd": self._password,
                 },
                 allow_redirects=True,
+                timeout=_TIMEOUT,
             ) as r2:
                 r2.raise_for_status()
                 text2 = await r2.text(encoding="latin-1")
@@ -185,6 +188,7 @@ class LissyClient:
                     "pgaction": "noframegen",
                     "c": c,
                 },
+                timeout=_TIMEOUT,
             ) as r:
                 r.raise_for_status()
                 top_text = await r.text(encoding="latin-1")
@@ -200,6 +204,7 @@ class LissyClient:
                     "c": c,
                     "pgnr": pgnr,
                 },
+                timeout=_TIMEOUT,
             ) as r:
                 r.raise_for_status()
                 text = await r.text(encoding="latin-1")
@@ -208,7 +213,9 @@ class LissyClient:
                 r"window\.location\.replace\(['\"]([^'\"]+)['\"]", text
             )
             if redirect:
-                async with session.get(urljoin(self._base_url, redirect.group(1))) as r:
+                async with session.get(
+                    urljoin(self._base_url, redirect.group(1)), timeout=_TIMEOUT
+                ) as r:
                     r.raise_for_status()
                     text = await r.text(encoding="latin-1")
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
@@ -312,7 +319,9 @@ class LissyClient:
                 data[m["name"]] = m["value"]
 
             try:
-                async with session.post(self._base_url, data=data) as r:
+                async with session.post(
+                    self._base_url, data=data, timeout=_TIMEOUT
+                ) as r:
                     r.raise_for_status()
                     text = await r.text(encoding="latin-1")
 
@@ -324,7 +333,7 @@ class LissyClient:
                     # "pg=...??c=...&&..." — collapse the doubled "??" and
                     # "&&" into a single "?" so urljoin produces a valid URL.
                     frame_url = urljoin(self._base_url, raw_src.replace("??&&", "?"))
-                    async with session.get(frame_url) as r:
+                    async with session.get(frame_url, timeout=_TIMEOUT) as r:
                         r.raise_for_status()
                         text = await r.text(encoding="latin-1")
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
