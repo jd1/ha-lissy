@@ -140,6 +140,43 @@ async def test_due_date_format_variant_is_not_counted_as_renewal(
     )
 
 
+async def test_stale_backwards_due_date_move_is_not_counted_as_renewal(
+    hass: HomeAssistant,
+):
+    """A scrape predating a concurrent renewal must not inflate the count."""
+    coord = _coordinator(hass, AsyncMock(return_value=list(LOANS)))
+    coord.async_set_restored_data(_with_renewals(LOANS_2, 4))
+    await hass.async_block_till_done()
+
+    with patch.object(
+        coord._snapshot_store, "async_save", new=AsyncMock()
+    ) as mock_save:
+        result = await coord._async_update_data()
+        await hass.async_block_till_done()
+
+    # The date regressed (stale payload): the count carries over untouched...
+    assert result == [{**LOANS[0], "renewals": 4}]
+    # ...while the regressed state itself is still persisted.
+    mock_save.assert_awaited_once_with([{**LOANS[0], "renewals": 4}])
+
+
+async def test_unparseable_previous_date_is_not_counted_as_renewal(
+    hass: HomeAssistant,
+):
+    coord = _coordinator(hass, AsyncMock(return_value=list(LOANS)))
+    coord.async_set_restored_data(_with_renewals([{**LOANS[0], "due_date": "—"}], 2))
+    await hass.async_block_till_done()
+
+    with patch.object(
+        coord._snapshot_store, "async_save", new=AsyncMock()
+    ) as mock_save:
+        result = await coord._async_update_data()
+        await hass.async_block_till_done()
+
+    assert result == _with_renewals(LOANS, 2)
+    mock_save.assert_awaited_once_with(_with_renewals(LOANS, 2))
+
+
 async def test_metadata_change_without_date_move_keeps_count(hass: HomeAssistant):
     renamed = [{**LOANS[0], "title": "Book One (2nd ed.)"}]
     coord = _coordinator(hass, AsyncMock(return_value=renamed))
