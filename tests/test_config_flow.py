@@ -38,6 +38,7 @@ async def test_user_flow_success(hass):
         )
 
     assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["result"].unique_id == "12345@x"
     assert result["title"] == "Lissy (12345)"
     assert result["data"] == USER_INPUT
 
@@ -81,6 +82,7 @@ async def test_user_flow_invalid_url(hass):
 
 
 async def test_duplicate_aborts(hass):
+    """A pre-multi-library entry (username-only id) still blocks a re-add."""
     MockConfigEntry(domain=DOMAIN, unique_id="12345", data=USER_INPUT).add_to_hass(hass)
 
     with _patch_client():
@@ -93,6 +95,79 @@ async def test_duplicate_aborts(hass):
 
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "already_configured"
+
+
+async def test_legacy_duplicate_ignores_scheme_and_trailing_slash(hass):
+    """The legacy match compares portal hosts, not raw url spellings."""
+    MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="12345",
+        data={
+            "username": "12345",
+            "password": "secret",
+            "base_url": "https://x/lissy/lissy.ly/",
+        },
+    ).add_to_hass(hass)
+
+    with _patch_client():
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        # http vs https and the missing trailing slash must not matter.
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], USER_INPUT
+        )
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+async def test_new_scheme_duplicate_aborts(hass):
+    """Re-adding an account created under username@host aborts by unique id."""
+    MockConfigEntry(domain=DOMAIN, unique_id="12345@x", data=USER_INPUT).add_to_hass(
+        hass
+    )
+
+    with _patch_client():
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], USER_INPUT
+        )
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+async def test_same_username_at_second_library_is_allowed(hass):
+    """One card number at two portals yields two entries."""
+    MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="12345",
+        data={
+            "username": "12345",
+            "password": "secret",
+            "base_url": "http://x/lissy/lissy.ly",
+        },
+    ).add_to_hass(hass)
+
+    other_library = {
+        "username": "12345",
+        "password": "secret",
+        "base_url": "http://other.example.com/lissy/lissy.ly",
+    }
+    with _patch_client():
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], other_library
+        )
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["result"].unique_id == "12345@other.example.com"
+    assert result["data"] == other_library
 
 
 async def test_reauth_flow_updates_password(hass):
