@@ -98,18 +98,34 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             entry = reg.async_get(entity_id)
             if not entry or not entry.config_entry_id:
                 continue
-            config_entry_id = entry.config_entry_id
             # unique_id pattern for item sensors: {entry_id}_item_{mednr}
-            if entry.unique_id and ITEM_ID_SEP in entry.unique_id:
-                mednr = entry.unique_id.split(ITEM_ID_SEP, 1)[1]
-                current = targets_by_entry.get(config_entry_id, set())
-                if current is not None:  # don't downgrade an existing "all"
-                    current.add(mednr)
-                    targets_by_entry[config_entry_id] = current
-            else:
+            if not entry.unique_id or ITEM_ID_SEP not in entry.unique_id:
                 raise ServiceValidationError(
                     f"{entity_id} is not a renewable item sensor"
                 )
+            # Only actionable targets may enter the map: an entry that is
+            # missing, foreign, or not loaded would otherwise be dropped
+            # again during execution and turn the call into a silent no-op.
+            cfg_entry = hass.config_entries.async_get_entry(entry.config_entry_id)
+            if (
+                cfg_entry is None
+                or cfg_entry.domain != DOMAIN
+                or getattr(cfg_entry, "runtime_data", None) is None
+            ):
+                continue
+            mednr = entry.unique_id.split(ITEM_ID_SEP, 1)[1]
+            current = targets_by_entry.get(entry.config_entry_id, set())
+            if current is not None:  # don't downgrade an existing "all"
+                current.add(mednr)
+                targets_by_entry[entry.config_entry_id] = current
+
+        # With the invariant above, an empty map means every given target
+        # was stale/unknown — fail loudly instead of silently doing nothing.
+        # Partially resolvable input still renews what did resolve.
+        if not targets_by_entry:
+            raise ServiceValidationError(
+                "None of the given targets resolve to a loaded Lissy account"
+            )
 
         cfg_entries = hass.config_entries
         for entry_id, targets in targets_by_entry.items():
