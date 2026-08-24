@@ -134,7 +134,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 continue
             coordinator: LissyCoordinator = cfg_entry.runtime_data
             try:
-                result = await coordinator.client.renew(targets)
+                # async_renew renews, annotates and pushes under the same
+                # lock as polls, so a concurrent poll can neither scrape
+                # mid-renewal nor double-count its result.
+                result = await coordinator.async_renew(targets)
             except LissyNotFoundError as e:
                 raise ServiceValidationError(str(e)) from e
             except LissyAuthError as e:
@@ -142,14 +145,6 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 raise HomeAssistantError(f"Renew failed: {e}") from e
             except LissyConnectionError as e:
                 raise HomeAssistantError(f"Renew failed: {e}") from e
-            # renew() already fetched the fresh loan list — reuse it instead of
-            # triggering a second full login + scrape. Annotation embeds the
-            # authoritative renewal results before the state update dispatches,
-            # so listeners never see stale counts.
-            counted = coordinator.async_record_renewals(
-                result["renewed"], result["list"]
-            )
-            coordinator.async_set_updated_data(counted)
             failed = [
                 attempt for attempt in result["renewed"] if not attempt["renewed"]
             ]

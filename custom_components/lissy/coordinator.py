@@ -17,6 +17,7 @@ from .api import (
     LissyClient,
     LissyConnectionError,
     LoanItem,
+    RenewResponse,
     RenewResult,
     parse_leihfrist,
 )
@@ -86,6 +87,12 @@ class LissyCoordinator(DataUpdateCoordinator[list[CountedLoan]]):
             hass, _STORAGE_VERSION, f"{DOMAIN}_loans_{entry.entry_id}"
         )
         self._persist_task: asyncio.Task[None] | None = None
+        # Serializes renewals against periodic polls. Without it, a poll
+        # scraping between a renewal landing server-side and the renewed
+        # state being pushed counts the renewal heuristically, and the
+        # authoritative increment in async_renew stacks on top of it —
+        # one renewal, count +2, persisted forever.
+        self._renew_refresh_lock = asyncio.Lock()
 
     async def async_load_snapshot(self) -> list[CountedLoan] | None:
         """Load the persisted loan-list snapshot, if any.
@@ -167,16 +174,35 @@ class LissyCoordinator(DataUpdateCoordinator[list[CountedLoan]]):
             f"{DOMAIN} persist snapshot",
         )
 
+    async def async_renew(self, targets: set[str] | None) -> RenewResponse:
+        """Renew loans, annotate and push the fresh loan list atomically.
+
+        ``renew`` already fetches the fresh loan list, so its result is
+        reused instead of triggering a second login + scrape; annotation
+        embeds the authoritative renewal results before the state update
+        dispatches so listeners never see stale counts.
+
+        Runs under the same lock as polls (see ``_renew_refresh_lock``):
+        that is what keeps a concurrent poll from double-counting the
+        renewal this method is about to record.
+        """
+        async with self._renew_refresh_lock:
+            result = await self.client.renew(targets)
+            counted = self.async_record_renewals(result["renewed"], result["list"])
+            self.async_set_updated_data(counted)
+            return result
+
     async def _async_update_data(self) -> list[CountedLoan]:
-        try:
-            loans = await self.client.list_loans()
-        except LissyAuthError as e:
-            raise ConfigEntryAuthFailed from e
-        except LissyConnectionError as e:
-            raise UpdateFailed(str(e)) from e
-        counted = self._annotate(loans)
-        self._schedule_snapshot_persist(counted)
-        return counted
+        async with self._renew_refresh_lock:
+            try:
+                loans = await self.client.list_loans()
+            except LissyAuthError as e:
+                raise ConfigEntryAuthFailed from e
+            except LissyConnectionError as e:
+                raise UpdateFailed(str(e)) from e
+            counted = self._annotate(loans)
+            self._schedule_snapshot_persist(counted)
+            return counted
 
     def async_record_renewals(
         self, renewed: list[RenewResult], loans: list[LoanItem]

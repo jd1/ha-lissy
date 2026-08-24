@@ -264,6 +264,72 @@ async def test_record_renewals_leaves_unmoved_items_alone(hass: HomeAssistant):
     ]
 
 
+async def test_async_renew_pushes_annotated_result(hass: HomeAssistant):
+    coord = _coordinator(hass, AsyncMock(return_value=[]))
+    coord.async_set_restored_data(_with_renewals(LOANS, 1))
+    coord.client.renew = AsyncMock(
+        return_value={
+            "renewed": [{"media_id": "111", "renewed": True, "reason": ""}],
+            "list": list(LOANS_2),
+        }
+    )
+
+    result = await coord.async_renew(None)
+
+    coord.client.renew.assert_awaited_once_with(None)
+    assert result["renewed"][0]["renewed"] is True
+    assert coord.data == _with_renewals(LOANS_2, 2)
+
+
+async def test_poll_cannot_run_mid_renew(hass: HomeAssistant):
+    """A poll blocked behind a renewal never double-counts it.
+
+    Regression test for the poll/renew race: without serialization the
+    poll scrapes after the renewal landed but before the renewed state
+    was pushed, counting the renewal heuristically, and the renew's
+    authoritative increment stacks on top — one renewal, count +2.
+    """
+    coord = _coordinator(hass, AsyncMock(return_value=list(LOANS_2)))
+    coord.async_set_restored_data(_with_renewals(LOANS, 0))
+    await hass.async_block_till_done()
+
+    renew_started = asyncio.Event()
+    renew_can_finish = asyncio.Event()
+    poll_started = asyncio.Event()
+
+    async def slow_renew(targets):
+        renew_started.set()
+        await renew_can_finish.wait()
+        return {
+            "renewed": [{"media_id": "111", "renewed": True, "reason": ""}],
+            "list": list(LOANS_2),
+        }
+
+    async def slow_list_loans():
+        poll_started.set()  # only reachable once the renew released the lock
+        return list(LOANS_2)
+
+    coord.client.renew = slow_renew
+    coord.client.list_loans = slow_list_loans
+
+    renew_task = asyncio.create_task(coord.async_renew(None))
+    await renew_started.wait()
+    poll_task = asyncio.create_task(coord._async_update_data())
+    for _ in range(5):
+        await asyncio.sleep(0)
+    # The renewal holds the lock — the poll must not have scraped yet.
+    assert not poll_started.is_set()
+
+    renew_can_finish.set()
+    renew_out = await renew_task
+    poll_out = await poll_task
+
+    assert renew_out["renewed"][0]["renewed"] is True
+    # Exactly one count: the post-renew poll sees no date move.
+    assert poll_out == _with_renewals(LOANS_2, 1)
+    assert coord.data == _with_renewals(LOANS_2, 1)
+
+
 async def test_annotation_never_mutates_caller_owned_input(hass: HomeAssistant):
     pristine_loans = copy.deepcopy(LOANS)
     pristine_loans_2 = copy.deepcopy(LOANS_2)
