@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.6.0](https://github.com/jd1/ha-lissy/compare/v0.5.3...v0.6.0) (2026-08-25)
+
+
+### Features
+
+* **ci:** add opencode workflow to convert ai-pr issues into prs ([493bf9b](https://github.com/jd1/ha-lissy/commit/493bf9bc81d022133f640856287891d0899a0321))
+* **config_flow:** allow one card number at multiple libraries ([0874db9](https://github.com/jd1/ha-lissy/commit/0874db9d67aa1c9fee06e31be58602111942c9ca))
+* **coordinator:** persist loan-list snapshot across restarts ([f205bdb](https://github.com/jd1/ha-lissy/commit/f205bdb91dcab5ae31adb350a9193fcf45530696))
+* **lissy:** track per-item renewal counts ([ca2818b](https://github.com/jd1/ha-lissy/commit/ca2818b631a9f9f224621462953eb4e0fd52e12d))
+
+
+### Bug Fixes
+
+* **ci:** avoid duplicate runs and use valid hetzner model format ([b5f7b5c](https://github.com/jd1/ha-lissy/commit/b5f7b5c70f1fa0902fa0c82bd756c998f6db7d97))
+* **ci:** register hetzner as custom opencode provider ([c74b92f](https://github.com/jd1/ha-lissy/commit/c74b92f4ba22649f3696d36e7538947a6f807831))
+* **ci:** Use different model prefix ([0d0ba0a](https://github.com/jd1/ha-lissy/commit/0d0ba0a78ec2b4eac8c8d24de1a517753ef9c8ac))
+* **coordinator:** serialize renew against concurrent polls ([e13ea6a](https://github.com/jd1/ha-lissy/commit/e13ea6a217b056ebec5564e030d539a860fd0ce2))
+* **lissy:** chain config-entry migration and assert final version ([55590b5](https://github.com/jd1/ha-lissy/commit/55590b51aeb9da5671727e8639114980a59f320f))
+* **lissy:** enforce timeouts on api requests ([65555ab](https://github.com/jd1/ha-lissy/commit/65555ab245e98df69f17b82a98a96294c45f6497))
+* **lissy:** fail loudly when renew targets resolve to nothing ([27e2e1c](https://github.com/jd1/ha-lissy/commit/27e2e1c12b8598dba6ac9e932aac4637cbf60f6d))
+* **lissy:** only count forward due date moves as renewals ([69f5475](https://github.com/jd1/ha-lissy/commit/69f5475c4732d38d191d02e91f8a295b1e274b2d))
+
+
+### Performance Improvements
+
+* **ci:** Add Python setup and install dependencies ([db5bd6f](https://github.com/jd1/ha-lissy/commit/db5bd6f2f85c0d773a4ede03eadbd62ba911260f))
+
 ## [0.5.3](https://github.com/jd1/ha-lissy/compare/v0.5.2...v0.5.3) (2026-08-09)
 
 
