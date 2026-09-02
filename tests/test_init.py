@@ -108,7 +108,9 @@ async def test_renew_all_via_device(hass):
 
     entry, client = await _setup(hass)
     dev_reg = dev_reg_helper.async_get(hass)
-    device = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    device = dev_reg.async_get_device_by_identifier(
+        (DOMAIN, entry.entry_id), entry.entry_id
+    )
 
     await hass.services.async_call(
         DOMAIN,
