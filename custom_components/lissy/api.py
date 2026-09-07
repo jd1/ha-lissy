@@ -106,6 +106,18 @@ class LissyConnectionError(Exception):
     pass
 
 
+class LissyResponseError(LissyConnectionError):
+    """Unexpected portal response structure (not transient, do not retry).
+
+    Subclasses LissyConnectionError so consumers that only map connection
+    failures (config flow, renew service) keep treating it as
+    cannot_connect; the coordinator catches the subclass first to skip
+    the retry.
+    """
+
+    pass
+
+
 class LissyNotFoundError(Exception):
     def __init__(self, missing: set[str]) -> None:
         self.missing = missing
@@ -146,7 +158,7 @@ class LissyClient:
                 _LOGGER.debug(
                     "Login page HTML (first 5000 chars): %s", _redact_tokens(text)
                 )
-            raise LissyConnectionError("Unexpected login page structure")
+            raise LissyResponseError("Unexpected login page structure")
         c = m_c.group(1)
         mgcnum = m_mgc.group(1)
         bnrlgncke = m_bnr.group(1)
