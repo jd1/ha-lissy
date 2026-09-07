@@ -13,7 +13,11 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
-from custom_components.lissy.api import LissyAuthError, LissyConnectionError
+from custom_components.lissy.api import (
+    LissyAuthError,
+    LissyConnectionError,
+    LissyResponseError,
+)
 from custom_components.lissy.const import DOMAIN
 from custom_components.lissy.coordinator import LissyCoordinator
 
@@ -70,8 +74,39 @@ async def test_async_update_data_connection_error_raises_update_failed(
     hass: HomeAssistant,
 ):
     coord = _coordinator(hass, AsyncMock(side_effect=LissyConnectionError("down")))
+    with (
+        pytest.raises(UpdateFailed),
+        patch(
+            "custom_components.lissy.coordinator.asyncio.sleep",
+            new=AsyncMock(),
+        ),
+    ):
+        await coord._async_update_data()
+    assert coord.client.list_loans.call_count == 3
+
+
+async def test_async_update_data_retries_transient_error_then_succeeds(
+    hass: HomeAssistant,
+):
+    list_loans = AsyncMock(side_effect=[LissyConnectionError("dns timeout"), LOANS])
+    coord = _coordinator(hass, list_loans)
+    with patch(
+        "custom_components.lissy.coordinator.asyncio.sleep",
+        new=AsyncMock(),
+    ) as sleep:
+        assert await coord._async_update_data() == _with_renewals(LOANS, 0)
+    assert list_loans.call_count == 2
+    assert sleep.call_count == 1
+
+
+async def test_async_update_data_response_error_does_not_retry(
+    hass: HomeAssistant,
+):
+    list_loans = AsyncMock(side_effect=LissyResponseError("unexpected structure"))
+    coord = _coordinator(hass, list_loans)
     with pytest.raises(UpdateFailed):
         await coord._async_update_data()
+    assert list_loans.call_count == 1
 
 
 async def test_due_date_move_persists_snapshot_with_incremented_count(
@@ -453,3 +488,13 @@ async def test_shutdown_cancels_pending_persist_task(hass: HomeAssistant):
 
     assert task.done()
     save_can_finish.set()
+
+
+async def test_async_update_data_auth_error_does_not_retry(
+    hass: HomeAssistant,
+):
+    list_loans = AsyncMock(side_effect=LissyAuthError("bad"))
+    coord = _coordinator(hass, list_loans)
+    with pytest.raises(ConfigEntryAuthFailed):
+        await coord._async_update_data()
+    assert list_loans.call_count == 1

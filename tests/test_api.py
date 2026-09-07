@@ -13,6 +13,7 @@ from custom_components.lissy.api import (
     LissyClient,
     LissyConnectionError,
     LissyNotFoundError,
+    LissyResponseError,
     _redact_tokens,
     _WARNED_TYPES,
     parse_leihfrist,
@@ -308,14 +309,14 @@ async def test_login_no_token_raises_auth_error():
         await client._login(session)
 
 
-async def test_login_malformed_page_raises_connection_error():
+async def test_login_malformed_page_raises_response_error():
     client = LissyClient("user123", "pass456", "http://x/lissy/lissy.ly")
     session = MagicMock()
     session.get = MagicMock(
         side_effect=_cm(_mock_response("<html>nothing here</html>"))
     )
 
-    with pytest.raises(LissyConnectionError, match="Unexpected login page structure"):
+    with pytest.raises(LissyResponseError, match="Unexpected login page structure"):
         await client._login(session)
 
 

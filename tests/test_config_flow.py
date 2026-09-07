@@ -9,7 +9,11 @@ from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.lissy.api import LissyAuthError, LissyConnectionError
+from custom_components.lissy.api import (
+    LissyAuthError,
+    LissyConnectionError,
+    LissyResponseError,
+)
 from custom_components.lissy.const import DOMAIN
 
 USER_INPUT = {
@@ -48,6 +52,9 @@ async def test_user_flow_success(hass):
     [
         (LissyAuthError, "invalid_auth"),
         (LissyConnectionError, "cannot_connect"),
+        # Subclass of LissyConnectionError — unexpected portal structure
+        # must surface as cannot_connect, not crash the flow.
+        (LissyResponseError, "cannot_connect"),
     ],
 )
 async def test_user_flow_errors(hass, exc, expected):

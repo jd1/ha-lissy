@@ -16,6 +16,7 @@ from .api import (
     LissyAuthError,
     LissyClient,
     LissyConnectionError,
+    LissyResponseError,
     LoanItem,
     RenewResponse,
     RenewResult,
@@ -24,6 +25,8 @@ from .api import (
 from .const import DOMAIN, UPDATE_INTERVAL_HOURS
 
 _LOGGER = logging.getLogger(__name__)
+
+_RETRY_DELAYS = (5, 15)
 
 type LissyConfigEntry = ConfigEntry[LissyCoordinator]
 
@@ -192,14 +195,35 @@ class LissyCoordinator(DataUpdateCoordinator[list[CountedLoan]]):
             self.async_set_updated_data(counted)
             return result
 
-    async def _async_update_data(self) -> list[CountedLoan]:
-        async with self._renew_refresh_lock:
+    async def _fetch_loans(self) -> list[LoanItem]:
+        """Fetch loans, retrying transient connection errors with delays."""
+        for attempt, delay in enumerate((*_RETRY_DELAYS, None)):
             try:
-                loans = await self.client.list_loans()
+                return await self.client.list_loans()
             except LissyAuthError as e:
                 raise ConfigEntryAuthFailed from e
-            except LissyConnectionError as e:
+            except LissyResponseError as e:
+                # Caught before LissyConnectionError: subclass, not transient.
                 raise UpdateFailed(str(e)) from e
+            except LissyConnectionError as e:
+                if delay is None:
+                    raise UpdateFailed(str(e)) from e
+                _LOGGER.warning(
+                    "Lissy refresh failed (attempt %d/%d), retrying in %ds: %s",
+                    attempt + 1,
+                    len(_RETRY_DELAYS) + 1,
+                    delay,
+                    e,
+                )
+                await asyncio.sleep(delay)
+        raise AssertionError("unreachable")
+
+    async def _async_update_data(self) -> list[CountedLoan]:
+        # The whole fetch (including retry sleeps) holds the renew lock so a
+        # concurrent renew still cannot interleave and double-count. Renew
+        # waits behind the lock for at most sum(_RETRY_DELAYS) on an outage.
+        async with self._renew_refresh_lock:
+            loans = await self._fetch_loans()
             counted = self._annotate(loans)
             self._schedule_snapshot_persist(counted)
             return counted
