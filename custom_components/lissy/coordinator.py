@@ -96,6 +96,10 @@ class LissyCoordinator(DataUpdateCoordinator[list[CountedLoan]]):
         # authoritative increment in async_renew stacks on top of it —
         # one renewal, count +2, persisted forever.
         self._renew_refresh_lock = asyncio.Lock()
+        # Raw per-item outcome of the most recent renew() call, so
+        # automations can report *why* an item failed after the service
+        # raises under ``continue_on_error`` (the exception text is lost).
+        self.last_renew: list[RenewResult] | None = None
 
     async def async_load_snapshot(self) -> list[CountedLoan] | None:
         """Load the persisted loan-list snapshot, if any.
@@ -191,6 +195,10 @@ class LissyCoordinator(DataUpdateCoordinator[list[CountedLoan]]):
         """
         async with self._renew_refresh_lock:
             result = await self.client.renew(targets)
+            # Stash the raw outcome before dispatch so item sensors expose
+            # the server reason even though the service raises afterwards
+            # (lost under ``continue_on_error`` in automations).
+            self.last_renew = result["renewed"]
             counted = self.async_record_renewals(result["renewed"], result["list"])
             self.async_set_updated_data(counted)
             return result
