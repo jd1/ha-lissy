@@ -307,6 +307,54 @@ async def test_renew_partial_failure_reports_failed_item(hass):
     assert entry.runtime_data.last_renew is not None
 
 
+async def test_failed_renew_attempt_clears_stale_reasons(hass):
+    """A dying attempt wipes last_renew so sensors never advertise
+    the previous run's reasons as the cause of the current failure."""
+    renew_ok = AsyncMock(
+        return_value={
+            "renewed": [
+                {"media_id": "111", "renewed": False, "reason": "Vormerkung"},
+            ],
+            "list": list(LOANS),
+        }
+    )
+    entry, client = await _setup(hass, renew=renew_ok)
+
+    with pytest.raises(HomeAssistantError, match="Vormerkung"):
+        await hass.services.async_call(
+            DOMAIN,
+            "renew",
+            {"entity_id": "sensor.lissy_12345_book_one"},
+            blocking=True,
+        )
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.lissy_12345_book_one")
+    assert state.attributes.get("last_renew_reason") == "Vormerkung"
+
+    # Next attempt dies with a connection error: the stale reason must go.
+    client.renew = AsyncMock(side_effect=LissyConnectionError("boom"))
+    with pytest.raises(HomeAssistantError, match="Renew failed"):
+        await hass.services.async_call(
+            DOMAIN,
+            "renew",
+            {"entity_id": "sensor.lissy_12345_book_one"},
+            blocking=True,
+        )
+    await hass.async_block_till_done()
+
+    assert entry.runtime_data.last_renew is None
+    state = hass.states.get("sensor.lissy_12345_book_one")
+    assert state.attributes.get("last_renew_reason") is None
+    assert state.attributes.get("last_renew_ok") is None
+    assert (
+        hass.states.get("sensor.lissy_12345_borrowed").attributes.get(
+            "last_renew_failed"
+        )
+        == []
+    )
+
+
 async def test_renew_service_exposes_renewal_count_on_sensors(hass):
     """A successful renew bumps `renewals` on the item and summary sensors."""
     moved = AsyncMock(

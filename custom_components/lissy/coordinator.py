@@ -194,6 +194,17 @@ class LissyCoordinator(DataUpdateCoordinator[list[CountedLoan]]):
         renewal this method is about to record.
         """
         async with self._renew_refresh_lock:
+            # Invalidate the previous outcome before the attempt: if this
+            # call dies (connection error, auth failure) the sensors must
+            # not keep advertising stale reasons from an earlier run. The
+            # listener refresh rewrites the cached state immediately, so
+            # blueprint templates reading the attributes right after a
+            # failure see "no reason", not the previous attempt's. Only
+            # notify when something actually changes to avoid a redundant
+            # state dispatch on every successful renew.
+            if self.last_renew is not None:
+                self.last_renew = None
+                self.async_update_listeners()
             result = await self.client.renew(targets)
             # Stash the raw outcome before dispatch so item sensors expose
             # the server reason even though the service raises afterwards
