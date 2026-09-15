@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/jd1/ha-lissy/compare/v0.6.0...v0.7.0) (2026-09-15)
+
+
+### Features
+
+* **lissy:** retry transient refresh failures without masking bad responses ([1028f4f](https://github.com/jd1/ha-lissy/commit/1028f4f295a6850231abc9de16bd45980d8f8e8b))
+
 ## [0.6.0](https://github.com/jd1/ha-lissy/compare/v0.5.3...v0.6.0) (2026-08-25)
 
 
