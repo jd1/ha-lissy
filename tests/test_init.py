@@ -208,7 +208,7 @@ async def test_renew_unknown_mednr_is_validation_error(hass):
         )
 
 
-async def test_renew_failure_surfaces_as_error(hass):
+async def test_renew_failure_surfaces_as_error(hass, caplog):
     """A Nein response from the library raises HomeAssistantError with the reason."""
     renew = AsyncMock(
         return_value={
@@ -222,15 +222,137 @@ async def test_renew_failure_surfaces_as_error(hass):
             "list": list(LOANS),
         }
     )
-    _, _ = await _setup(hass, renew=renew)
+    entry, _ = await _setup(hass, renew=renew)
 
-    with pytest.raises(HomeAssistantError, match="Keine Fristverlängerung"):
+    with caplog.at_level("WARNING", logger="custom_components.lissy"):
+        with pytest.raises(HomeAssistantError, match="Keine Fristverlängerung"):
+            await hass.services.async_call(
+                DOMAIN,
+                "renew",
+                {"entity_id": "sensor.lissy_12345_book_one"},
+                blocking=True,
+            )
+    await hass.async_block_till_done()
+
+    # Error names the item (title + media_id), not just the media_id.
+    with pytest.raises(HomeAssistantError, match=r"Book One \(111\)") as exc_info:
         await hass.services.async_call(
             DOMAIN,
             "renew",
             {"entity_id": "sensor.lissy_12345_book_one"},
             blocking=True,
         )
+    assert "Keine Fristverlängerung" in str(exc_info.value)
+
+    # The failure is logged with which item and why ...
+    assert any(
+        "111" in r.message and "Keine Fristverlängerung" in r.message
+        for r in caplog.records
+        if r.levelname == "WARNING"
+    )
+    # ... and stashed for automations even though the service raised.
+    assert entry.runtime_data.last_renew is not None
+    assert entry.runtime_data.last_renew[0]["reason"].startswith(
+        "Keine Fristverlängerung"
+    )
+    item_state = hass.states.get("sensor.lissy_12345_book_one")
+    assert item_state.attributes.get("last_renew_reason", "").startswith(
+        "Keine Fristverlängerung"
+    )
+    assert item_state.attributes.get("last_renew_ok") is False
+    count_state = hass.states.get("sensor.lissy_12345_borrowed")
+    failed_attr = count_state.attributes.get("last_renew_failed")
+    assert failed_attr and failed_attr[0]["media_id"] == "111"
+    assert failed_attr[0]["title"] == "Book One"
+    assert "Keine Fristverlängerung" in failed_attr[0]["reason"]
+
+
+async def test_renew_partial_failure_reports_failed_item(hass):
+    """One ok + one Nein: error names only the failed item with its reason."""
+    renew = AsyncMock(
+        return_value={
+            "renewed": [
+                {"media_id": "111", "renewed": True, "reason": ""},
+                {"media_id": "222", "renewed": False, "reason": "Vormerkung"},
+            ],
+            "list": list(LOANS),
+        }
+    )
+    entry, _ = await _setup(hass, renew=renew)
+
+    with pytest.raises(HomeAssistantError, match=r"DVD Two \(222\).*Vormerkung"):
+        await hass.services.async_call(
+            DOMAIN,
+            "renew",
+            {
+                "entity_id": [
+                    "sensor.lissy_12345_book_one",
+                    "sensor.lissy_12345_dvd_two",
+                ]
+            },
+            blocking=True,
+        )
+    await hass.async_block_till_done()
+
+    assert (
+        hass.states.get("sensor.lissy_12345_book_one").attributes.get("last_renew_ok")
+        is True
+    )
+    dvd_state = hass.states.get("sensor.lissy_12345_dvd_two")
+    assert dvd_state.attributes.get("last_renew_reason") == "Vormerkung"
+    failed_attr = hass.states.get("sensor.lissy_12345_borrowed").attributes.get(
+        "last_renew_failed"
+    )
+    assert [f["media_id"] for f in failed_attr] == ["222"]
+    assert entry.runtime_data.last_renew is not None
+
+
+async def test_failed_renew_attempt_clears_stale_reasons(hass):
+    """A dying attempt wipes last_renew so sensors never advertise
+    the previous run's reasons as the cause of the current failure."""
+    renew_ok = AsyncMock(
+        return_value={
+            "renewed": [
+                {"media_id": "111", "renewed": False, "reason": "Vormerkung"},
+            ],
+            "list": list(LOANS),
+        }
+    )
+    entry, client = await _setup(hass, renew=renew_ok)
+
+    with pytest.raises(HomeAssistantError, match="Vormerkung"):
+        await hass.services.async_call(
+            DOMAIN,
+            "renew",
+            {"entity_id": "sensor.lissy_12345_book_one"},
+            blocking=True,
+        )
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.lissy_12345_book_one")
+    assert state.attributes.get("last_renew_reason") == "Vormerkung"
+
+    # Next attempt dies with a connection error: the stale reason must go.
+    client.renew = AsyncMock(side_effect=LissyConnectionError("boom"))
+    with pytest.raises(HomeAssistantError, match="Renew failed"):
+        await hass.services.async_call(
+            DOMAIN,
+            "renew",
+            {"entity_id": "sensor.lissy_12345_book_one"},
+            blocking=True,
+        )
+    await hass.async_block_till_done()
+
+    assert entry.runtime_data.last_renew is None
+    state = hass.states.get("sensor.lissy_12345_book_one")
+    assert state.attributes.get("last_renew_reason") is None
+    assert state.attributes.get("last_renew_ok") is None
+    assert (
+        hass.states.get("sensor.lissy_12345_borrowed").attributes.get(
+            "last_renew_failed"
+        )
+        == []
+    )
 
 
 async def test_renew_service_exposes_renewal_count_on_sensors(hass):

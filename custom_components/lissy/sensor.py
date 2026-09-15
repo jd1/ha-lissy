@@ -81,6 +81,16 @@ class LissyCountSensor(_LissyBase):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        titles = {m["media_id"]: m["title"] for m in (self.coordinator.data or [])}
+        failed = [
+            {
+                "media_id": r["media_id"],
+                "title": titles.get(r["media_id"], r["media_id"]),
+                "reason": r["reason"],
+            }
+            for r in (self.coordinator.last_renew or [])
+            if not r["renewed"]
+        ]
         return {
             "items": [
                 {
@@ -90,7 +100,8 @@ class LissyCountSensor(_LissyBase):
                     "renewals": item.get("renewals", 0),
                 }
                 for item in (self.coordinator.data or [])
-            ]
+            ],
+            "last_renew_failed": failed,
         }
 
 
@@ -186,12 +197,22 @@ class LissyItemSensor(_LissyBase):
         if not (item := self._item()):
             return {}
         due = parse_leihfrist(item["due_date"])
+        last = next(
+            (
+                r
+                for r in (self.coordinator.last_renew or [])
+                if r["media_id"] == self._media_id
+            ),
+            None,
+        )
         return {
             "media_id": item["media_id"],
             "media_type": item["media_type"],
             "note": item["note"],
             "days_until_due": (due - dt_util.now().date()).days if due else None,
             "renewals": item.get("renewals", 0),
+            "last_renew_ok": last["renewed"] if last is not None else None,
+            "last_renew_reason": last["reason"] if last is not None else None,
         }
 
 
