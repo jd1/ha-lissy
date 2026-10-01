@@ -96,6 +96,10 @@ class LissyCoordinator(DataUpdateCoordinator[list[CountedLoan]]):
         # authoritative increment in async_renew stacks on top of it —
         # one renewal, count +2, persisted forever.
         self._renew_refresh_lock = asyncio.Lock()
+        # Raw per-item outcome of the most recent renew() call, so
+        # automations can report *why* an item failed after the service
+        # raises under ``continue_on_error`` (the exception text is lost).
+        self.last_renew: list[RenewResult] | None = None
 
     async def async_load_snapshot(self) -> list[CountedLoan] | None:
         """Load the persisted loan-list snapshot, if any.
@@ -190,7 +194,22 @@ class LissyCoordinator(DataUpdateCoordinator[list[CountedLoan]]):
         renewal this method is about to record.
         """
         async with self._renew_refresh_lock:
+            # Invalidate the previous outcome before the attempt: if this
+            # call dies (connection error, auth failure) the sensors must
+            # not keep advertising stale reasons from an earlier run. The
+            # listener refresh rewrites the cached state immediately, so
+            # blueprint templates reading the attributes right after a
+            # failure see "no reason", not the previous attempt's. Only
+            # notify when something actually changes to avoid a redundant
+            # state dispatch on every successful renew.
+            if self.last_renew is not None:
+                self.last_renew = None
+                self.async_update_listeners()
             result = await self.client.renew(targets)
+            # Stash the raw outcome before dispatch so item sensors expose
+            # the server reason even though the service raises afterwards
+            # (lost under ``continue_on_error`` in automations).
+            self.last_renew = result["renewed"]
             counted = self.async_record_renewals(result["renewed"], result["list"])
             self.async_set_updated_data(counted)
             return result

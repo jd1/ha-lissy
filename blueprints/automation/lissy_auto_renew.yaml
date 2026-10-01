@@ -102,7 +102,14 @@ action:
       - action: "{{ notify_target }}"
         data:
           title: "Lissy renewal failed"
-          message: "One or more loans could not be renewed automatically. Check Home Assistant logs for details."
+          message: >
+            {% set ns = namespace(parts=[]) %}
+            {% for e in failed_entities %}
+              {% set name = state_attr(e, 'friendly_name') or e %}
+              {% set reason = state_attr(e, 'last_renew_reason') %}
+              {% set ns.parts = ns.parts + [name ~ (': ' ~ reason if reason else '')] %}
+            {% endfor %}
+            {{ 'Could not renew: ' ~ ns.parts | join('; ') }}
   - if:
       - condition: template
         value_template: "{{ notify_on_success and (renewed_entities | length > 0) }}"

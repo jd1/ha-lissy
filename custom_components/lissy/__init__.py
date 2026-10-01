@@ -145,17 +145,33 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 raise HomeAssistantError(f"Renew failed: {e}") from e
             except LissyConnectionError as e:
                 raise HomeAssistantError(f"Renew failed: {e}") from e
-            failed = [
-                attempt for attempt in result["renewed"] if not attempt["renewed"]
-            ]
+            # Titles for human-readable errors/notifications. coordinator.data
+            # was already refreshed by async_renew; merge with the fresh list
+            # so failed items that vanished still resolve. last_renew was
+            # stashed inside async_renew before dispatch, so sensors already
+            # expose the server reason even though we raise below (lost under
+            # ``continue_on_error`` in automations).
+            titles = {m["media_id"]: m["title"] for m in (coordinator.data or [])}
+            titles.update({m["media_id"]: m["title"] for m in result["list"]})
+            failed = [r for r in result["renewed"] if not r["renewed"]]
             if failed:
+                for r in failed:
+                    title = titles.get(r["media_id"], r["media_id"])
+                    _LOGGER.warning(
+                        "Renewal failed for %s (%s): %s",
+                        title,
+                        r["media_id"],
+                        r["reason"] or "no reason given",
+                    )
                 reasons = "; ".join(
                     (
-                        f"{attempt['media_id']}: {attempt['reason']}"
-                        if attempt["reason"]
-                        else attempt["media_id"]
+                        f"{titles.get(r['media_id'], r['media_id'])}"
+                        f" ({r['media_id']}): {r['reason']}"
+                        if r["reason"]
+                        else f"{titles.get(r['media_id'], r['media_id'])}"
+                        f" ({r['media_id']})"
                     )
-                    for attempt in failed
+                    for r in failed
                 )
                 raise HomeAssistantError(f"Renewal failed: {reasons}")
 
