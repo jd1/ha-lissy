@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/jd1/ha-lissy/compare/v0.6.0...v0.7.0) (2026-10-01)
+
+
+### Features
+
+* **lissy:** retry transient refresh failures without masking bad responses ([1028f4f](https://github.com/jd1/ha-lissy/commit/1028f4f295a6850231abc9de16bd45980d8f8e8b))
+
+
+### Bug Fixes
+
+* Align BeautifulSoup version with Home Assistant dependency requirements (fixes [#36](https://github.com/jd1/ha-lissy/issues/36)) ([9ce8e7a](https://github.com/jd1/ha-lissy/commit/9ce8e7abad9fa4b5420fe9af2574f0f8a536e4a8))
+
 ## [0.6.0](https://github.com/jd1/ha-lissy/compare/v0.5.3...v0.6.0) (2026-08-25)
 
 
