@@ -75,4 +75,5 @@ A Docker Compose setup is included for local testing:
 ```
 
 Opens Home Assistant at http://localhost:8123 with the integration mounted read-only from `custom_components/`.
+The start script pulls the latest `:stable` image first, so each run tests against the current Home Assistant release.
 Changes to source files take effect after restarting the HA container (`docker compose restart homeassistant`).
