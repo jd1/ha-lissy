@@ -1,6 +1,7 @@
 {
   "name": "Lissy Library",
   "render_readme": true,
+  "homeassistant": "2026.9.0",
   "zip_release": true,
   "filename": "lissy.zip"
 }

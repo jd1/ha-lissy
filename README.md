@@ -15,6 +15,8 @@ Tracks borrowed items from a Lissy-based public library system.
 
 ## Installation via HACS
 
+Requires **Home Assistant 2026.9 or newer**.
+
 1. Add this repository as a custom repository in HACS (category: **Integration**)
 2. Install **Lissy Library**
 3. Restart Home Assistant
