@@ -10,13 +10,10 @@ from .const import DOMAIN
 from .coordinator import LissyCoordinator
 
 
-class LissyEntity(CoordinatorEntity[LissyCoordinator]):
-    """Common base: device info + has_entity_name for all Lissy entities."""
+class LissyDeviceInfo:
+    """Mixin: device info shared by all Lissy entity platforms."""
 
-    _attr_has_entity_name = True
-
-    def __init__(self, coordinator: LissyCoordinator, entry: ConfigEntry) -> None:
-        super().__init__(coordinator)
+    def __init__(self, entry: ConfigEntry) -> None:
         self._entry = entry
 
     @property
@@ -26,3 +23,16 @@ class LissyEntity(CoordinatorEntity[LissyCoordinator]):
             name=self._entry.title,
             manufacturer="Lissy",
         )
+
+
+class LissyEntity(LissyDeviceInfo, CoordinatorEntity[LissyCoordinator]):
+    """Common base: device info + has_entity_name for all Lissy entities."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator: LissyCoordinator, entry: ConfigEntry) -> None:
+        # Direct base calls, not cooperative super(): the bases take
+        # different constructor arguments (and LissyDeviceInfo sits earlier
+        # in the MRO, so super() wouldn't reach CoordinatorEntity).
+        CoordinatorEntity.__init__(self, coordinator)
+        LissyDeviceInfo.__init__(self, entry)

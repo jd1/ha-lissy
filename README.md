@@ -34,6 +34,14 @@ During setup you will be asked for:
 | Password | Your library account password |
 | Base URL | URL of your Lissy portal (optional if using the default) |
 
+## Options
+
+Open **Settings → Devices & Services → Lissy → Configure**:
+
+| Option | Description |
+|---|---|
+| Show library card barcode | Off by default. When enabled, an image entity (`image.…_barcode`) is created that renders your library card number as a Code39 barcode, so you can show and scan it at the library desk. Lowercase letters are encoded as uppercase; numbers containing characters outside the Code39 alphabet (A-Z, 0-9, space, `- . $ / + %`) are rejected and the entity is not created. |
+
 ## Services
 
 ### `lissy.renew`

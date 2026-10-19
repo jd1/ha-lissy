@@ -210,3 +210,104 @@ async def test_reauth_flow_invalid_auth(hass):
 
     assert result["type"] == FlowResultType.FORM
     assert result["errors"] == {"base": "invalid_auth"}
+
+
+async def test_options_flow_defaults_to_false(hass):
+    """The options flow shows the barcode toggle, default off."""
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="12345", data=USER_INPUT)
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "init"
+
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {})
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert entry.options == {"show_barcode": False}
+
+
+async def test_options_flow_toggle_reloads_and_creates_barcode(hass):
+    """Enabling the option reloads the entry and adds the image entity."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="12345",
+        title="Lissy (12345)",
+        data=USER_INPUT,
+    )
+    entry.add_to_hass(hass)
+    client = AsyncMock()
+    client.list_loans = AsyncMock(return_value=[])
+
+    with patch("custom_components.lissy.LissyClient", return_value=client):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert hass.states.get("image.lissy_12345_barcode") is None
+
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"show_barcode": True}
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert entry.options == {"show_barcode": True}
+    assert hass.states.get("image.lissy_12345_barcode") is not None
+
+
+async def test_options_flow_rejects_unencodable_username(hass):
+    """Enabling the barcode with an unencodable account number shows an error."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="12ä34",
+        title="Lissy (12ä34)",
+        data={
+            "username": "12ä34",
+            "password": "secret",
+            "base_url": "http://x/lissy/lissy.ly",
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"show_barcode": True}
+    )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"] == {"base": "barcode_unencodable"}
+    assert entry.options == {}
+
+    # Disabling instead stores the option without error.
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"show_barcode": False}
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert entry.options == {"show_barcode": False}
+
+
+async def test_options_flow_disable_removes_barcode(hass):
+    """Turning the option off again removes the image entity via reload."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="12345",
+        title="Lissy (12345)",
+        data=USER_INPUT,
+        options={"show_barcode": True},
+    )
+    entry.add_to_hass(hass)
+    client = AsyncMock()
+    client.list_loans = AsyncMock(return_value=[])
+
+    with patch("custom_components.lissy.LissyClient", return_value=client):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert hass.states.get("image.lissy_12345_barcode") is not None
+
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"show_barcode": False}
+        )
+        await hass.async_block_till_done()
+
+    assert entry.options == {"show_barcode": False}
+    assert hass.states.get("image.lissy_12345_barcode") is None

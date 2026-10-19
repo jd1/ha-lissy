@@ -9,16 +9,17 @@ from urllib.parse import urlsplit
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
 )
 
 from .api import LissyAuthError, LissyClient, LissyConnectionError
-from .const import DOMAIN
+from .const import CONF_SHOW_BARCODE, DEFAULT_SHOW_BARCODE, DOMAIN
 
 _URL_SUFFIX = "lissy/lissy.ly"
 
@@ -73,6 +74,14 @@ async def _validate_credentials(
 
 class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 2
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> LissyOptionsFlow:
+        """Create the options flow handler."""
+        return LissyOptionsFlow()
 
     async def async_step_user(self, user_input=None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -136,4 +145,44 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
+        )
+
+
+def _options_schema(default: bool) -> vol.Schema:
+    """Schema for the options step with the current toggle value as default."""
+    return vol.Schema(
+        {vol.Required(CONF_SHOW_BARCODE, default=default): BooleanSelector()}
+    )
+
+
+class LissyOptionsFlow(config_entries.OptionsFlowWithReload):
+    """Handle Lissy options; reloads the entry automatically on change."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            if user_input[CONF_SHOW_BARCODE]:
+                # Local import keeps barcode/Pillow out of the config-flow
+                # import path when the image platform isn't used.
+                from .image import code39_value
+
+                if code39_value(self.config_entry.data["username"]) is None:
+                    return self.async_show_form(
+                        step_id="init",
+                        data_schema=_options_schema(
+                            self.config_entry.options.get(
+                                CONF_SHOW_BARCODE, DEFAULT_SHOW_BARCODE
+                            )
+                        ),
+                        errors={"base": "barcode_unencodable"},
+                    )
+            return self.async_create_entry(title="", data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=_options_schema(
+                self.config_entry.options.get(CONF_SHOW_BARCODE, DEFAULT_SHOW_BARCODE)
+            ),
         )
