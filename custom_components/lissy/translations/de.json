@@ -31,6 +31,22 @@
       "reauth_successful": "Erneute Anmeldung erfolgreich"
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Lissy Bibliothek Optionen",
+        "data": {
+          "show_barcode": "Bibliotheksausweis als Barcode anzeigen"
+        },
+        "data_description": {
+          "show_barcode": "Erstellt eine Bild-Entität, die die Ausweisnummer als Code39-Barcode darstellt, sodass sie an der Bibliothekstheke gescannt werden kann. Kleinbuchstaben werden als Großbuchstaben kodiert."
+        }
+      }
+    },
+    "error": {
+      "barcode_unencodable": "Die Ausweisnummer enthält Zeichen, die nicht als Code39 kodiert werden können (nach Großschreibung erlaubt: A-Z, 0-9, Leerzeichen sowie - . $ / + %)."
+    }
+  },
   "services": {
     "renew": {
       "name": "Leihfristen verlängern",

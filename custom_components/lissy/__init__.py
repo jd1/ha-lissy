@@ -18,7 +18,7 @@ from .api import LissyAuthError, LissyClient, LissyConnectionError, LissyNotFoun
 from .const import DOMAIN, ITEM_ID_SEP
 from .coordinator import LissyConfigEntry, LissyCoordinator
 
-PLATFORMS = [Platform.SENSOR, Platform.CALENDAR]
+PLATFORMS = [Platform.SENSOR, Platform.CALENDAR, Platform.IMAGE]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 _LOGGER = logging.getLogger(__name__)
