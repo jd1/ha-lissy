@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlsplit
 
-import voluptuous as vol
+import probatio
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.core import HomeAssistant, callback
@@ -40,13 +40,13 @@ def _unique_id_for(username: str, base_url: str) -> str:
     return f"{username}@{_portal_host(base_url)}"
 
 
-STEP_SCHEMA = vol.Schema(
+STEP_SCHEMA = probatio.Schema(
     {
-        vol.Required("username"): str,
-        vol.Required("password"): TextSelector(
+        probatio.Required("username"): str,
+        probatio.Required("password"): TextSelector(
             TextSelectorConfig(type=TextSelectorType.PASSWORD)
         ),
-        vol.Required("base_url"): TextSelector(
+        probatio.Required("base_url"): TextSelector(
             TextSelectorConfig(type=TextSelectorType.URL)
         ),
     }
@@ -137,9 +137,9 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema(
+            data_schema=probatio.Schema(
                 {
-                    vol.Required("password"): TextSelector(
+                    probatio.Required("password"): TextSelector(
                         TextSelectorConfig(type=TextSelectorType.PASSWORD)
                     )
                 }
@@ -148,10 +148,10 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
 
-def _options_schema(default: bool) -> vol.Schema:
+def _options_schema(default: bool) -> probatio.Schema:
     """Schema for the options step with the current toggle value as default."""
-    return vol.Schema(
-        {vol.Required(CONF_SHOW_BARCODE, default=default): BooleanSelector()}
+    return probatio.Schema(
+        {probatio.Required(CONF_SHOW_BARCODE, default=default): BooleanSelector()}
     )
 
 
