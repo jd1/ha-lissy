@@ -19,9 +19,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .api import LissyAuthError, LissyClient, LissyConnectionError
-from .const import CONF_SHOW_BARCODE, DEFAULT_SHOW_BARCODE, DOMAIN
-
-_URL_SUFFIX = "lissy/lissy.ly"
+from .const import CONF_SHOW_BARCODE, DEFAULT_SHOW_BARCODE, DOMAIN, URL_SUFFIX
 
 
 def _portal_host(base_url: str) -> str:
@@ -87,7 +85,7 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             user_input["username"] = user_input["username"].strip()
-            if not user_input["base_url"].rstrip("/").endswith(_URL_SUFFIX):
+            if not user_input["base_url"].rstrip("/").endswith(URL_SUFFIX):
                 errors = {"base_url": "invalid_url"}
             else:
                 errors = await _validate_credentials(self.hass, user_input)

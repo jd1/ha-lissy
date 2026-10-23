@@ -1,4 +1,5 @@
 DOMAIN = "lissy"
+URL_SUFFIX = "lissy/lissy.ly"
 UPDATE_INTERVAL_HOURS = 4
 ITEM_ID_SEP = "_item_"
 CONF_SHOW_BARCODE = "show_barcode"
