@@ -359,6 +359,21 @@ async def test_list_loans():
     assert loans[1]["media_id"] == "87654321"
 
 
+async def test_list_loans_scrapes_card_number():
+    """The Benutzernr. label on the loans page is recorded on the client."""
+    client = LissyClient("3505383", "pass", "http://x/lissy/lissy.ly")
+    mock_session = _make_session(
+        _mock_response(LOGIN_PAGE_HTML),
+        _mock_response(POST_LOGIN_HTML),
+        _mock_response(TOPFRAME_HTML),
+        _mock_response("Benutzernr.: 03505383" + LOANS_HTML),
+    )
+    with patch.object(client, "_new_session", return_value=mock_session):
+        await client.list_loans()
+
+    assert client.card_number == "03505383"
+
+
 # ---------------------------------------------------------------------------
 # renew
 # ---------------------------------------------------------------------------
@@ -554,3 +569,38 @@ def test_redact_tokens_truncates_long_html():
 def test_redact_tokens_preserves_short_html_without_tokens():
     html = "<html>nothing here</html>"
     assert _redact_tokens(html) == html
+
+
+def test_extract_card_number_with_leading_zero():
+    """The label the portal shows carries the full leading-zero form."""
+    from custom_components.lissy.api import extract_card_number
+
+    assert extract_card_number("Benutzernr.: 03505383") == "03505383"
+
+
+def test_extract_card_number_label_variants():
+    """Case, colon and Benutzernummer spellings all resolve."""
+    from custom_components.lissy.api import extract_card_number
+
+    assert extract_card_number("benutzernr 123456") == "123456"
+    assert extract_card_number("Benutzernummer: 234567") == "234567"
+    assert extract_card_number("BenutzerNr.:123456") == "123456"
+
+
+def test_extract_card_number_none_when_label_missing():
+    """No label — extraction yields None (username fallback applies)."""
+    from custom_components.lissy.api import extract_card_number
+
+    assert extract_card_number("<html><body>leer</body></html>") is None
+
+
+def test_card_number_first_label_wins():
+    """The first page carrying the label sets the number, later ones don't."""
+    client = LissyClient("3505383", "pin", "http://x")
+    assert client.card_number is None
+
+    client._remember_card_number("Benutzernr.: 03505383")
+    assert client.card_number == "03505383"
+
+    client._remember_card_number("Benutzernr.: 09999999")
+    assert client.card_number == "03505383"

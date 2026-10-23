@@ -98,6 +98,21 @@ def _redact_tokens(html: str) -> str:
     return redacted[:5000]
 
 
+_CARD_NUMBER_RE = re.compile(r"Benutzern(?:r\.?|ummer)\s*:?\s*([0-9]+)", re.IGNORECASE)
+
+
+def extract_card_number(html: str) -> str | None:
+    """Extract the portal's canonical card number from the shown HTML.
+
+    Lissy portals display the full number the library card carries,
+    leading zero included ("Benutzernr.: 03505383"), while the username
+    a user logs in with may be the same number without the prefix.
+    Returns None when no label variant is present.
+    """
+    match = _CARD_NUMBER_RE.search(html)
+    return match.group(1) if match else None
+
+
 class LissyAuthError(Exception):
     pass
 
@@ -136,6 +151,15 @@ class LissyClient:
         self._password = password
         self._base_url = base_url
         self._shared_session = session
+        # The canonical card number as the portal displays it (leading
+        # zero included) — filled by _login/_entl_html from the pages
+        # they fetch; the barcode prefers it over the login username.
+        self.card_number: str | None = None
+
+    def _remember_card_number(self, html: str) -> None:
+        """Record the portal's canonical card number (first label wins)."""
+        if self.card_number is None:
+            self.card_number = extract_card_number(html)
 
     def _new_session(self) -> aiohttp.ClientSession:
         return aiohttp.ClientSession(headers=_HEADERS, timeout=_TIMEOUT)
@@ -188,6 +212,8 @@ class LissyClient:
             raise LissyAuthError(
                 "Login failed — bad credentials or unexpected response"
             )
+
+        self._remember_card_number(text2)
         return match.group(1)
 
     async def _entl_html(self, session: aiohttp.ClientSession, c: str) -> str:
@@ -235,6 +261,12 @@ class LissyClient:
 
         if _LOGGER.isEnabledFor(logging.DEBUG):
             _LOGGER.debug("Loans page HTML: %s", _redact_tokens(text))
+
+        # The loans page is where the portal shows the canonical card
+        # number (leading zero included); the topframe repeats it on
+        # some portals. Loans page first — first label wins.
+        self._remember_card_number(text)
+        self._remember_card_number(top_text)
         return text
 
     @staticmethod

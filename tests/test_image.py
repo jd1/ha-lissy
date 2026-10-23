@@ -36,6 +36,22 @@ async def test_opt_in_creates_image_entity(hass):
     # ~420x170 px for the default 5-digit ID.
     assert 350 <= img.width <= 600
     assert 160 <= img.height <= 180
+    # No portal number in this fixture — username fallback.
+    assert image.content == _generate_code39_png("12345")
+
+
+async def test_scraped_card_number_takes_precedence(hass):
+    """The barcode encodes the portal's number (leading zero included)."""
+    await setup_lissy_entry(
+        hass, username="3505383", card_number="03505383", options={"show_barcode": True}
+    )
+
+    state = hass.states.get("sensor.lissy_3505383_borrowed")
+    assert state.attributes["card_number"] == "03505383"
+
+    image = await async_get_image(hass, "image.lissy_3505383_barcode")
+    assert image.content == _generate_code39_png("03505383")
+    assert image.content != _generate_code39_png("3505383")
 
 
 async def test_lowercase_username_renders_uppercase(hass):

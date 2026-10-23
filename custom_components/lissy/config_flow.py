@@ -166,9 +166,9 @@ class LissyOptionsFlow(config_entries.OptionsFlowWithReload):
             if user_input[CONF_SHOW_BARCODE]:
                 # Local import keeps barcode/Pillow out of the config-flow
                 # import path when the image platform isn't used.
-                from .image import code39_value
+                from .image import code39_value, resolve_card_number
 
-                if code39_value(self.config_entry.data["username"]) is None:
+                if code39_value(resolve_card_number(self.config_entry)) is None:
                     return self.async_show_form(
                         step_id="init",
                         data_schema=_options_schema(

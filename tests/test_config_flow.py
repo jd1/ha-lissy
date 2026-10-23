@@ -237,6 +237,7 @@ async def test_options_flow_toggle_reloads_and_creates_barcode(hass):
     entry.add_to_hass(hass)
     client = AsyncMock()
     client.list_loans = AsyncMock(return_value=[])
+    client.card_number = None
 
     with patch("custom_components.lissy.LissyClient", return_value=client):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -297,6 +298,7 @@ async def test_options_flow_disable_removes_barcode(hass):
     entry.add_to_hass(hass)
     client = AsyncMock()
     client.list_loans = AsyncMock(return_value=[])
+    client.card_number = None
 
     with patch("custom_components.lissy.LissyClient", return_value=client):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -311,3 +313,37 @@ async def test_options_flow_disable_removes_barcode(hass):
 
     assert entry.options == {"show_barcode": False}
     assert hass.states.get("image.lissy_12345_barcode") is None
+
+
+async def test_options_flow_accepts_scraped_number(hass):
+    """An unencodable username with a valid portal number can enable."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="12ä34",
+        title="Lissy (12ä34)",
+        data={
+            "username": "12ä34",
+            "password": "secret",
+            "base_url": "http://x/lissy/lissy.ly",
+        },
+    )
+    entry.add_to_hass(hass)
+    client = AsyncMock()
+    client.list_loans = AsyncMock(return_value=[])
+    client.card_number = "03505383"
+
+    with patch("custom_components.lissy.LissyClient", return_value=client):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert hass.states.get("image.lissy_12a34_barcode") is None
+
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"show_barcode": True}
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert entry.options == {"show_barcode": True}
+    # The barcode encodes the scraped number with the leading zero.
+    assert hass.states.get("image.lissy_12a34_barcode") is not None

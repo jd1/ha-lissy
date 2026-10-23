@@ -82,6 +82,9 @@ class LissyCountSensor(_LissyBase):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {
+            # The number the barcode encodes — the portal's canonical
+            # form when available (leading zero included), else None.
+            "card_number": self.coordinator.client.card_number,
             "items": [
                 {
                     "media_id": item["media_id"],
@@ -90,7 +93,7 @@ class LissyCountSensor(_LissyBase):
                     "renewals": item.get("renewals", 0),
                 }
                 for item in (self.coordinator.data or [])
-            ]
+            ],
         }
 
 
