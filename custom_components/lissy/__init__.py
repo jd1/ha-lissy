@@ -14,7 +14,13 @@ from homeassistant.helpers import (
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import LissyAuthError, LissyClient, LissyConnectionError, LissyNotFoundError
+from .api import (
+    LissyAuthError,
+    LissyClient,
+    LissyConnectionError,
+    LissyNoRenewableError,
+    LissyNotFoundError,
+)
 from .const import DOMAIN, ITEM_ID_SEP
 from .coordinator import LissyConfigEntry, LissyCoordinator
 
@@ -139,6 +145,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 # mid-renewal nor double-count its result.
                 result = await coordinator.async_renew(targets)
             except LissyNotFoundError as e:
+                raise ServiceValidationError(str(e)) from e
+            except LissyNoRenewableError as e:
                 raise ServiceValidationError(str(e)) from e
             except LissyAuthError as e:
                 cfg_entry.async_start_reauth(hass)

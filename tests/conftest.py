@@ -39,7 +39,9 @@ async def setup_lissy_entry(
     entry.add_to_hass(hass)
 
     client = AsyncMock()
-    client.list_loans = AsyncMock(return_value=list(loans))
+    client.list_loans = AsyncMock(
+        return_value={"loans": list(loans), "restrictions": []}
+    )
     client.renew = AsyncMock(return_value={"renewed": [], "list": list(loans)})
     # Real attribute, not an auto-created mock: the barcode resolution
     # relies on None meaning "portal didn't show the number".

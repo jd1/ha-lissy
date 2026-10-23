@@ -94,6 +94,7 @@ class LissyCountSensor(_LissyBase):
                 }
                 for item in (self.coordinator.data or [])
             ],
+            "restrictions": list(self.coordinator.restrictions),
         }
 
 
@@ -204,6 +205,7 @@ def _icon_for_type(media_type: MediaType) -> str:
         MediaType.MAGAZINE: "mdi:newspaper",
         MediaType.CD: "mdi:disc",
         MediaType.DVD: "mdi:disc-player",
+        MediaType.BLURAY: "mdi:disc-player",
         MediaType.AUDIOBOOK: "mdi:headphones",
         MediaType.GAME: "mdi:puzzle",
     }.get(media_type, "mdi:library")
