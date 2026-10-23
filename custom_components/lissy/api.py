@@ -92,10 +92,15 @@ def _clean(text: str) -> str:
     return text.replace(_ZWSP, "")
 
 
-def _redact_tokens(html: str) -> str:
-    """Redact session tokens from HTML before logging to prevent replay attacks."""
+def _redact_tokens(html: str, limit: int | None = 5000) -> str:
+    """Redact session tokens from HTML, optionally truncating the result.
+
+    Session tokens (c, mgcnum, bnrlgncke) let anyone replay a login, so
+    they are redacted wherever HTML leaves the process. Logs keep the
+    truncated default view; file dumps pass limit=None for the full page.
+    """
     redacted = re.sub(r"([?&](c|mgcnum|bnrlgncke)=)[a-zA-Z0-9]+", r"\1[REDACTED]", html)
-    return redacted[:5000]
+    return redacted[:limit] if limit is not None else redacted
 
 
 _CARD_NUMBER_RE = re.compile(r"Benutzern(?:r\.?|ummer)\s*:?\s*([0-9]+)", re.IGNORECASE)
@@ -155,6 +160,10 @@ class LissyClient:
         # zero included) — filled by _login/_entl_html from the pages
         # they fetch; the barcode prefers it over the login username.
         self.card_number: str | None = None
+        # Full HTML of the pages fetched by the most recent login cycle,
+        # keyed login/post_login/topframe/loans — read by debugging
+        # tools (scripts/dump-portal.py), never persisted by the client.
+        self.pages: dict[str, str] = {}
 
     def _remember_card_number(self, html: str) -> None:
         """Record the portal's canonical card number (first label wins)."""
@@ -173,6 +182,8 @@ class LissyClient:
                 text = await r.text(encoding="latin-1")
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             raise LissyConnectionError(str(e)) from e
+
+        self.pages["login"] = text
 
         m_c = re.search(r"[?&]c=([a-z0-9]+)", text, re.IGNORECASE)
         m_mgc = re.search(r"[?&]mgcnum=([A-Z0-9]+)", text, re.IGNORECASE)
@@ -205,6 +216,8 @@ class LissyClient:
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             raise LissyConnectionError(str(e)) from e
 
+        self.pages["post_login"] = text2
+
         if _LOGGER.isEnabledFor(logging.DEBUG):
             _LOGGER.debug("Post-login page HTML: %s", _redact_tokens(text2))
         match = re.search(r"[?&]c=([a-z0-9]+)", text2, re.IGNORECASE)
@@ -230,6 +243,8 @@ class LissyClient:
             ) as r:
                 r.raise_for_status()
                 top_text = await r.text(encoding="latin-1")
+
+            self.pages["topframe"] = top_text
 
             pgnr_match = re.search(r"pgnr=([A-Z0-9]+)", top_text)
             pgnr = pgnr_match.group(1) if pgnr_match else ""
@@ -267,6 +282,8 @@ class LissyClient:
         # some portals. Loans page first — first label wins.
         self._remember_card_number(text)
         self._remember_card_number(top_text)
+
+        self.pages["loans"] = text
         return text
 
     @staticmethod

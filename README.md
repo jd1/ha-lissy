@@ -78,3 +78,5 @@ A Docker Compose setup is included for local testing:
 Opens Home Assistant at http://localhost:8123 with the integration mounted read-only from `custom_components/`.
 The start script pulls the latest `:stable` image first, so each run tests against the current Home Assistant release.
 Changes to source files take effect after restarting the HA container (`docker compose restart homeassistant`).
+
+To inspect what the scraper actually sees (label variants, table quirks, the Benutzernr. placement), run `scripts/dump-portal.py` — it performs the same read-only login + loans fetch and saves every page under `portal-dump/`. It never touches the renew flow.
