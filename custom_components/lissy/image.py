@@ -68,6 +68,20 @@ def _generate_code39_png(username: str) -> bytes | None:
     return buf.getvalue()
 
 
+def resolve_card_number(entry: ConfigEntry) -> str:
+    """Resolve the number the barcode should encode.
+
+    Prefers the canonical card number the portal displays during login
+    (leading zero included, scraped by the client from its own pages);
+    falls back to the configured username when the portal doesn't show
+    one, or when the entry isn't loaded yet.
+    """
+    coordinator = getattr(entry, "runtime_data", None)
+    client = getattr(coordinator, "client", None)
+    scraped = getattr(client, "card_number", None)
+    return scraped or entry.data["username"]
+
+
 def _barcode_unique_id(entry: ConfigEntry) -> str:
     return f"{entry.entry_id}_barcode"
 
@@ -88,7 +102,7 @@ async def async_setup_entry(
             registry.async_remove(entity_id)
         return
 
-    if code39_value(entry.data["username"]) is None:
+    if code39_value(resolve_card_number(entry)) is None:
         _LOGGER.warning(
             "Barcode option is enabled for %s, but the account number "
             "cannot be encoded as Code39 — skipping the barcode entity",
@@ -96,7 +110,7 @@ async def async_setup_entry(
         )
         return
 
-    async_add_entities([LissyBarcodeImage(hass, entry)])
+    async_add_entities([LissyBarcodeImage(hass, entry, resolve_card_number(entry))])
 
 
 class LissyBarcodeImage(LissyDeviceInfo, ImageEntity):
@@ -107,11 +121,15 @@ class LissyBarcodeImage(LissyDeviceInfo, ImageEntity):
     _attr_icon = "mdi:barcode"
     _attr_content_type = "image/png"
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        # Direct base calls, not cooperative super(): ImageEntity and
-        # LissyDeviceInfo take different constructor arguments.
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, value: str) -> None:
+        """Direct base calls, not cooperative super(): ImageEntity and
+        LissyDeviceInfo take different constructor arguments."""
         ImageEntity.__init__(self, hass)
         LissyDeviceInfo.__init__(self, entry)
+        self._entry = entry
+        # Resolved at setup from the portal's canonical card number
+        # (preferred) or the configured username (fallback).
+        self._value = value
         self._attr_unique_id = _barcode_unique_id(entry)
         # The barcode is derived from static config data, so its content is
         # fixed from the moment the entity is created.
@@ -121,5 +139,5 @@ class LissyBarcodeImage(LissyDeviceInfo, ImageEntity):
     def image(self) -> bytes | None:
         """Return the barcode PNG, generating it once on first request."""
         if self._barcode is None:
-            self._barcode = _generate_code39_png(self._entry.data["username"])
+            self._barcode = _generate_code39_png(self._value)
         return self._barcode

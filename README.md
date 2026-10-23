@@ -10,6 +10,7 @@ Tracks borrowed items from a Lissy-based public library system.
 
 - **Sensors** for each borrowed item (state = due date)
 - **Summary sensors**: total borrowed count, next due date
+- **Card barcode image** (opt-in): a Code39 barcode of your card number for desk scanning, taken from the portal's displayed Benutzernr. (leading zero included) when available, otherwise the configured username
 - **Calendar** entity with all loan deadlines
 - **Service** `lissy.renew` to renew items directly from HA
 
@@ -42,7 +43,7 @@ Open **Settings → Devices & Services → Lissy → Configure**:
 
 | Option | Description |
 |---|---|
-| Show library card barcode | Off by default. When enabled, an image entity (`image.…_barcode`) is created that renders your library card number as a Code39 barcode, so you can show and scan it at the library desk. Lowercase letters are encoded as uppercase; numbers containing characters outside the Code39 alphabet (A-Z, 0-9, space, `- . $ / + %`) are rejected and the entity is not created. |
+| Show library card barcode | Off by default. When enabled, an image entity (`image.…_barcode`) is created that renders the number encoded on your library card — the portal's canonical number (leading zeros included) when the portal displays it, otherwise the configured username. Lowercase letters are encoded as uppercase; numbers containing characters outside the Code39 alphabet (A-Z, 0-9, space, `- . $ / + %`) are rejected and the entity is not created. |
 
 ## Services
 

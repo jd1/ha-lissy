@@ -25,7 +25,9 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa
 from custom_components.lissy.const import DOMAIN  # noqa: E402
 
 
-async def setup_lissy_entry(hass, *, username="12345", options=None, loans=()):
+async def setup_lissy_entry(
+    hass, *, username="12345", options=None, loans=(), card_number=None
+):
     """Set up a Lissy entry with a mocked client. Returns (entry, client)."""
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -39,6 +41,9 @@ async def setup_lissy_entry(hass, *, username="12345", options=None, loans=()):
     client = AsyncMock()
     client.list_loans = AsyncMock(return_value=list(loans))
     client.renew = AsyncMock(return_value={"renewed": [], "list": list(loans)})
+    # Real attribute, not an auto-created mock: the barcode resolution
+    # relies on None meaning "portal didn't show the number".
+    client.card_number = card_number
 
     with patch("custom_components.lissy.LissyClient", return_value=client):
         assert await hass.config_entries.async_setup(entry.entry_id)
