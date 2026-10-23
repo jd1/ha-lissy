@@ -232,6 +232,9 @@ class LissyClient:
                     text = await r.text(encoding="latin-1")
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             raise LissyConnectionError(str(e)) from e
+
+        if _LOGGER.isEnabledFor(logging.DEBUG):
+            _LOGGER.debug("Loans page HTML: %s", _redact_tokens(text))
         return text
 
     @staticmethod
