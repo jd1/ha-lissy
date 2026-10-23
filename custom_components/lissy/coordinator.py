@@ -86,6 +86,9 @@ class LissyCoordinator(DataUpdateCoordinator[list[CountedLoan]]):
             config_entry=entry,
         )
         self.client = client
+        # Account restrictions from the last scrape, e.g. an expired tariff
+        # ("Keine Fristverlängerung") — refreshed on every poll below.
+        self.restrictions: tuple[str, ...] = ()
         self._snapshot_store: _LoanSnapshotStore = _LoanSnapshotStore(
             hass, _STORAGE_VERSION, f"{DOMAIN}_loans_{entry.entry_id}"
         )
@@ -196,10 +199,15 @@ class LissyCoordinator(DataUpdateCoordinator[list[CountedLoan]]):
             return result
 
     async def _fetch_loans(self) -> list[LoanItem]:
-        """Fetch loans, retrying transient connection errors with delays."""
+        """Fetch loans, retrying transient connection errors with delays.
+
+        On every success the account restrictions (e.g. an expired tariff)
+        scraped alongside are stored on the coordinator so entities can
+        surface them — including clearing them once the tariff is renewed.
+        """
         for attempt, delay in enumerate((*_RETRY_DELAYS, None)):
             try:
-                return await self.client.list_loans()
+                page = await self.client.list_loans()
             except LissyAuthError as e:
                 raise ConfigEntryAuthFailed from e
             except LissyResponseError as e:
@@ -216,6 +224,9 @@ class LissyCoordinator(DataUpdateCoordinator[list[CountedLoan]]):
                     e,
                 )
                 await asyncio.sleep(delay)
+            else:
+                self.restrictions = tuple(page.get("restrictions") or ())
+                return page["loans"]
         raise AssertionError("unreachable")
 
     async def _async_update_data(self) -> list[CountedLoan]:

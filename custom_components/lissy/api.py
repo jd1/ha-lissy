@@ -24,6 +24,7 @@ class MediaType(StrEnum):
     GAME = "game"
     CD = "cd"
     DVD = "dvd"
+    BLURAY = "blu-ray"
     AUDIOBOOK = "audiobook"
     UNKNOWN = "unknown"
 
@@ -53,14 +54,35 @@ class RenewResponse(TypedDict):
     list: list[LoanItem]
 
 
+class LoansPage(TypedDict):
+    """Result of a full account scrape."""
+
+    loans: list[LoanItem]
+    restrictions: list[str]
+
+
+class _LoansHtml(TypedDict):
+    """Everything parseable from one account page's HTML."""
+
+    loans: list[LoanItem]
+    restrictions: list[str]
+    has_table: bool
+
+
 _MEDIA_TYPE_MAP: dict[str, MediaType] = {
     "buch": MediaType.BOOK,
     "zeitsc": MediaType.MAGAZINE,
     "spiel": MediaType.GAME,
     "cd": MediaType.CD,
     "dvd": MediaType.DVD,
+    "blu-ray": MediaType.BLURAY,
     "hörbuch": MediaType.AUDIOBOOK,
 }
+
+# The account page lists account restrictions ("WICHTIGER HINWEIS" block)
+# whose items follow a line containing this word, e.g. an expired tariff
+# ("Ihr Tarif ist abgelaufen") blocking online renewals.
+_RESTRICTION_MARKER = "Einschränkungen"
 
 _HEADERS = {
     "User-Agent": (
@@ -88,8 +110,8 @@ _ZWSP = "\u200b"
 
 
 def _clean(text: str) -> str:
-    """Strip zero-width spaces that Lissy portals inject into table cells."""
-    return text.replace(_ZWSP, "")
+    """Strip zero-width spaces and soft hyphens Lissy injects into cells."""
+    return text.replace(_ZWSP, "").replace("\u00ad", "")
 
 
 def _redact_tokens(html: str, limit: int | None = 5000) -> str:
@@ -142,6 +164,19 @@ class LissyNotFoundError(Exception):
     def __init__(self, missing: set[str]) -> None:
         self.missing = missing
         super().__init__(f"Med.nr. {', '.join(sorted(self.missing))} not found")
+
+
+class LissyNoRenewableError(Exception):
+    """The account offers no online renewal (restriction or nothing on loan)."""
+
+    def __init__(self, restrictions: list[str]) -> None:
+        self.restrictions = list(restrictions)
+        if restrictions:
+            super().__init__(f"No media can be renewed online — {restrictions[0]}")
+        else:
+            super().__init__(
+                "No media can be renewed online (nothing on loan or not renewable)"
+            )
 
 
 class LissyClient:
@@ -288,6 +323,15 @@ class LissyClient:
 
     @staticmethod
     def _parse_rows(html: str) -> list[LoanItem]:
+        """Parse loan rows from the account page's first headered table.
+
+        The row layout varies with account state: a renewable loan carries
+        a leading checkbox cell (6 cells), while a restricted account —
+        e.g. an expired tariff ("Keine Fristverlängerung") — drops it
+        entirely (5 cells). Rows are therefore anchored on the icon cell
+        instead of a fixed cell count, and the four data columns
+        (Med.nr. / Kurztitel / Leihfr. / Hinweis) follow it in order.
+        """
         soup = BeautifulSoup(html, "html.parser")
         # Anchor to the first table that has a <th> header row (the loans table).
         table = next(
@@ -298,10 +342,18 @@ class LissyClient:
             return []
         rows = []
         for tr in table.find_all("tr")[1:]:
-            cells = tr.find_all("td")
-            if len(cells) < 6:
+            cells = list(tr.find_all("td"))
+            if not cells:
                 continue
-            img = cells[1].find("img")
+            # Drop the leading renewal-checkbox cell when present.
+            if cells[0].find("input", attrs={"name": re.compile(r"^mednr\d+$")}):
+                cells = cells[1:]
+            # Anchor on the icon cell (the one holding the media-type image).
+            img_cell = next((c for c in cells if c.find("img")), None)
+            if img_cell is None or len(cells) - cells.index(img_cell) < 5:
+                continue
+            i = cells.index(img_cell)
+            img = img_cell.find("img")
             img_src_raw = img.get("src", "") if img else ""
             img_src = str(img_src_raw) if img_src_raw else ""
             raw_type = img_src.split("/")[-1].replace(".gif", "").lower()
@@ -313,14 +365,36 @@ class LissyClient:
                     )
             rows.append(
                 LoanItem(
-                    media_id=_clean(cells[2].get_text(strip=True)),
+                    media_id=_clean(cells[i + 1].get_text(strip=True)),
                     media_type=_MEDIA_TYPE_MAP.get(raw_type, MediaType.UNKNOWN),
-                    title=_clean(cells[3].get_text(strip=True)),
-                    due_date=_clean(cells[4].get_text(strip=True)),
-                    note=_clean(cells[5].get_text(strip=True)),
+                    title=_clean(cells[i + 2].get_text(strip=True)),
+                    due_date=_clean(cells[i + 3].get_text(strip=True)),
+                    note=_clean(cells[i + 4].get_text(strip=True)),
                 )
             )
         return rows
+
+    @staticmethod
+    def _parse_restrictions(html: str) -> list[str]:
+        """Account restrictions from the "WICHTIGER HINWEIS" block, if any."""
+        soup = BeautifulSoup(html, "html.parser")
+        node = soup.find(string=re.compile(_RESTRICTION_MARKER))
+        if node is None:
+            return []
+        ul = node.find_next("ul")
+        if ul is None:
+            return []
+        return [_clean(li.get_text(" ", strip=True)) for li in ul.find_all("li")]
+
+    @classmethod
+    def _parse_loans(cls, html: str) -> _LoansHtml:
+        """Parse loans and account restrictions from an account page."""
+        soup = BeautifulSoup(html, "html.parser")
+        return {
+            "loans": cls._parse_rows(html),
+            "restrictions": cls._parse_restrictions(html),
+            "has_table": any(t.find("th") for t in soup.find_all("table")),
+        }
 
     @staticmethod
     def _parse_checkboxes(html: str) -> list[_CheckboxInput]:
@@ -347,21 +421,30 @@ class LissyClient:
             return _noop()
         return self._new_session()
 
-    async def list_loans(self) -> list[LoanItem]:
+    async def list_loans(self) -> LoansPage:
         async with await self._get_session() as session:
             c = await self._login(session)
             html = await self._entl_html(session, c)
-        return self._parse_rows(html)
+        page = self._parse_loans(html)
+        if not page["has_table"]:
+            # A page without the loans table is not a valid account page —
+            # surfacing it avoids reporting a fabricated "no loans";
+            # structural, so no retry.
+            raise LissyResponseError("Unexpected account page — no loans table")
+        return {"loans": page["loans"], "restrictions": page["restrictions"]}
 
     async def renew(self, targets: set[str] | None = None) -> RenewResponse:
         """Renew loans. ``targets`` = mednrs to renew, or None for all."""
         async with await self._get_session() as session:
             c = await self._login(session)
             html = await self._entl_html(session, c)
+            page = self._parse_loans(html)
             all_media = self._parse_checkboxes(html)
 
             if not all_media:
-                return {"renewed": [], "list": []}
+                # No checkboxes on the loans page means the portal renders
+                # none — e.g. an expired tariff forbids online renewals.
+                raise LissyNoRenewableError(page["restrictions"])
 
             if targets is not None:
                 to_renew = [m for m in all_media if m["value"] in targets]
@@ -439,10 +522,10 @@ class LissyClient:
                     )
 
             # When no result table was returned, nothing was actually renewed,
-            # so the loan state is unchanged — reuse the HTML already fetched
-            # at the start instead of triggering another full page load.
+            # so the loan state is unchanged — reuse the parsed starting page
+            # instead of triggering another full page load.
             if table:
-                updated_list = self._parse_rows(await self._entl_html(session, c))
+                updated_page = self._parse_loans(await self._entl_html(session, c))
             else:
-                updated_list = self._parse_rows(html)
-            return {"renewed": renewed, "list": updated_list}
+                updated_page = page
+            return {"renewed": renewed, "list": updated_page["loans"]}

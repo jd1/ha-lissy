@@ -9,7 +9,11 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.lissy.api import LissyConnectionError, LissyNotFoundError
+from custom_components.lissy.api import (
+    LissyConnectionError,
+    LissyNoRenewableError,
+    LissyNotFoundError,
+)
 from custom_components.lissy.const import DOMAIN
 
 LOANS = [
@@ -41,7 +45,9 @@ async def _setup(hass, list_loans=None, renew=None):
     entry.add_to_hass(hass)
 
     client = AsyncMock()
-    client.list_loans = list_loans or AsyncMock(return_value=list(LOANS))
+    client.list_loans = list_loans or AsyncMock(
+        return_value={"loans": list(LOANS), "restrictions": []}
+    )
     client.renew = renew or AsyncMock(return_value={"renewed": [], "list": list(LOANS)})
 
     with patch("custom_components.lissy.LissyClient", return_value=client):
@@ -63,7 +69,7 @@ async def test_migrates_legacy_entry_without_base_url(hass):
     entry.add_to_hass(hass)
 
     client = AsyncMock()
-    client.list_loans = AsyncMock(return_value=[])
+    client.list_loans = AsyncMock(return_value={"loans": [], "restrictions": []})
 
     with patch("custom_components.lissy.LissyClient", return_value=client):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -84,6 +90,21 @@ async def test_setup_creates_entities(hass):
     assert hass.states.get("sensor.lissy_12345_book_one") is not None
     assert hass.states.get("sensor.lissy_12345_dvd_two") is not None
     assert hass.states.get("calendar.lissy_12345") is not None
+
+
+async def test_count_sensor_exposes_restrictions(hass):
+    """The Borrowed sensor surfaces account restrictions, e.g. expired tariff."""
+    list_loans = AsyncMock(
+        return_value={
+            "loans": list(LOANS),
+            "restrictions": ["Keine Fristverlängerung! Ihr Tarif ist abgelaufen."],
+        }
+    )
+    await _setup(hass, list_loans=list_loans)
+    state = hass.states.get("sensor.lissy_12345_borrowed")
+    assert state.attributes["restrictions"] == [
+        "Keine Fristverlängerung! Ihr Tarif ist abgelaufen."
+    ]
 
 
 async def test_item_sensor_days_until_due(hass):
@@ -186,6 +207,24 @@ async def test_renew_connection_error_surfaces(hass):
     _, _ = await _setup(hass, renew=renew)
 
     with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            DOMAIN,
+            "renew",
+            {"entity_id": "sensor.lissy_12345_book_one"},
+            blocking=True,
+        )
+
+
+async def test_renew_no_renewable_is_validation_error(hass):
+    """An expired tariff (no renewable media) is a clear validation error."""
+    renew = AsyncMock(
+        side_effect=LissyNoRenewableError(
+            ["Keine Fristverlängerung! Ihr Tarif ist abgelaufen."]
+        )
+    )
+    _, _ = await _setup(hass, renew=renew)
+
+    with pytest.raises(ServiceValidationError, match="Tarif ist abgelaufen"):
         await hass.services.async_call(
             DOMAIN,
             "renew",
