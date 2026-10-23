@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.7.0](https://github.com/jd1/ha-lissy/compare/v0.6.0...v0.7.0) (2026-10-23)
+
+
+### Features
+
+* **image:** add opt-in Code39 barcode of the account number ([2d3881d](https://github.com/jd1/ha-lissy/commit/2d3881d3ba3752c6aa66e2b856e6c93f87426a64)), closes [#33](https://github.com/jd1/ha-lissy/issues/33)
+* **lissy:** encode the portal's canonical card number in the barcode ([5007599](https://github.com/jd1/ha-lissy/commit/50075999be2752e7a0303bc1003e239cec87c104))
+* **lissy:** retry transient refresh failures without masking bad responses ([1028f4f](https://github.com/jd1/ha-lissy/commit/1028f4f295a6850231abc9de16bd45980d8f8e8b))
+* **scripts:** add a portal page dumper for debugging scraper changes ([333e859](https://github.com/jd1/ha-lissy/commit/333e8596eabae883294e124c91daf507500deb06))
+
+
+### Bug Fixes
+
+* Align BeautifulSoup version with Home Assistant dependency requirements (fixes [#36](https://github.com/jd1/ha-lissy/issues/36)) ([9ce8e7a](https://github.com/jd1/ha-lissy/commit/9ce8e7abad9fa4b5420fe9af2574f0f8a536e4a8))
+* **lissy:** build flow schemas with probatio ([e4351ca](https://github.com/jd1/ha-lissy/commit/e4351ca54ebaa3d6338999969401ff7d462fffa1))
+* **scripts:** run dump-portal without a Home Assistant installation ([25667a9](https://github.com/jd1/ha-lissy/commit/25667a987c59906a8e9d30bc80833ea8651843d7))
+
 ## [0.6.0](https://github.com/jd1/ha-lissy/compare/v0.5.3...v0.6.0) (2026-08-25)
 
 
