@@ -12,6 +12,7 @@ from custom_components.lissy.api import (
     LissyAuthError,
     LissyClient,
     LissyConnectionError,
+    LissyNoRenewableError,
     LissyNotFoundError,
     LissyResponseError,
     MediaType,
@@ -123,6 +124,45 @@ CHECKBOXES_HTML = """
   <input type="checkbox" name="mednr2" value="87654321"/>
 </form>
 </body></html>
+"""
+
+# Real expired-tariff account page (shape anonymized like the one above):
+# the portal drops the renewal-checkbox column ("Keine Fristverlängerung"),
+# so loan rows have only 5 cells — the previous fixed 6-cell rule silently
+# skipped every row, hiding all books behind a fake "0 borrowed".
+EXPIRED_LOANS_HTML = """
+<HTML><BODY>
+<P>
+<H4>Benutzernr.: 03505383</H4>
+<table border>
+<TR>
+<TH><font color="008080">&nbsp;</font>
+<TH><font color="008080">Med.nr.</font>
+<TH><font color="008080">Kurztitel</font>
+<TH><font color="008080">Leihfr.</font>
+<TH><font color="008080">Hinweis</font>
+<TR>
+<TD align=center><B><IMG SRC="/lissy/icosmall/blu-ray.gif" BORDER="0"></B></TD>
+<TD>3284&#x200b;3328</TD>
+<TD>Good boy - Wir wollen nur dein Bestes / Blu-r</TD>
+<TD align=center>16.10.&#x200b;2026</TD>
+<TD>1. Mah&shy;nung! 1.50
+</TR>
+<TR>
+<TD align=center><B><IMG SRC="/lissy/icosmall/buch.gif" BORDER="0"></B></TD>
+<TD>3280&#x200b;9952</TD>
+<TD>Müller, Silke: Schule gegen Kinder</TD>
+<TD align=center>17.10.&#x200b;2026</TD>
+<TD align=center>---
+</TR>
+</table>
+<HR><P><font color="ff0000"><B><I>WICHTIGER HINWEIS!</I></B><BR></font color>
+Ihr Konto unterliegt momentan folgenden Einschränkungen:
+<UL>
+<LI><B>Keine Fristverlängerung! Ihr Tarif ist abgelaufen.
+</B>
+</UL>
+</BODY></HTML>
 """
 
 # Shape copied from a real portal loans dump (content anonymized): the
@@ -403,11 +443,12 @@ async def test_list_loans():
         _mock_response(LOANS_HTML),
     )
     with patch.object(client, "_new_session", return_value=mock_session):
-        loans = await client.list_loans()
+        page = await client.list_loans()
 
-    assert len(loans) == 4
-    assert loans[0]["media_id"] == "12345678"
-    assert loans[1]["media_id"] == "87654321"
+    assert len(page["loans"]) == 4
+    assert page["loans"][0]["media_id"] == "12345678"
+    assert page["loans"][1]["media_id"] == "87654321"
+    assert page["restrictions"] == []
 
 
 async def test_list_loans_scrapes_card_number():
@@ -438,10 +479,12 @@ async def test_real_shaped_loans_page_parses():
         _mock_response(REAL_SHAPED_LOANS_HTML),
     )
     with patch.object(client, "_new_session", return_value=mock_session):
-        loans = await client.list_loans()
+        page = await client.list_loans()
 
     assert client.card_number == "01234567"
-    assert len(loans) == 2
+    assert page["restrictions"] == []
+    assert len(page["loans"]) == 2
+    loans = page["loans"]
     assert loans[0]["media_id"] == "11111122"
     assert loans[0]["media_type"] == MediaType.BOOK
     assert "Verlänge" in loans[0]["note"].replace("\xad", "")
@@ -513,18 +556,67 @@ async def test_renew_unknown_mednr_raises():
             await client.renew(targets={"99999999"})
 
 
-async def test_renew_no_media_returns_empty():
+async def test_page_of_expired_tariff_account():
+    """An expired-tariff page: its loans still parse, plus the restriction."""
     client = LissyClient("user123", "pass456", "http://x/lissy/lissy.ly")
     mock_session = _make_session(
         _mock_response(LOGIN_PAGE_HTML),
         _mock_response(POST_LOGIN_HTML),
         _mock_response(TOPFRAME_HTML),
-        _mock_response("<html><table></table></html>"),
+        _mock_response(EXPIRED_LOANS_HTML),
     )
     with patch.object(client, "_new_session", return_value=mock_session):
-        result = await client.renew()
+        page = await client.list_loans()
 
-    assert result == {"renewed": [], "list": []}
+    assert len(page["loans"]) == 2
+    assert page["restrictions"] == [
+        "Keine Fristverlängerung! Ihr Tarif ist abgelaufen."
+    ]
+    assert page["loans"][0]["media_id"] == "32843328"
+    assert page["loans"][0]["media_type"] == MediaType.BLURAY
+
+
+async def test_parse_rows_without_checkbox_column():
+    """Expired tariffs drop the checkbox column — 5-cell rows still parse."""
+    rows = LissyClient._parse_rows(EXPIRED_LOANS_HTML)
+    assert len(rows) == 2
+    assert rows[0]["media_id"] == "32843328"
+    assert rows[0]["media_type"] == "blu-ray"
+    assert rows[0]["title"] == "Good boy - Wir wollen nur dein Bestes / Blu-r"
+    assert rows[0]["due_date"] == "16.10.2026"
+    assert rows[0]["note"] == "1. Mahnung! 1.50"
+    assert rows[1]["media_id"] == "32809952"
+    assert rows[1]["media_type"] == "book"
+    assert rows[1]["note"] == "---"
+
+
+async def test_list_loans_missing_table_is_response_error():
+    """A page without a loans table is structural, never a fabricated zero."""
+    client = LissyClient("user123", "pass456", "http://x/lissy/lissy.ly")
+    mock_session = _make_session(
+        _mock_response(LOGIN_PAGE_HTML),
+        _mock_response(POST_LOGIN_HTML),
+        _mock_response(TOPFRAME_HTML),
+        _mock_response("<html></html>"),
+    )
+    with patch.object(client, "_new_session", return_value=mock_session):
+        with pytest.raises(LissyResponseError, match="no loans table"):
+            await client.list_loans()
+
+
+async def test_renew_no_checkboxes_restriction():
+    """A restricted account (expired tariff) renders no checkboxes — this is
+    an explicit error, not a silent no-op."""
+    client = LissyClient("user123", "pass456", "http://x/lissy/lissy.ly")
+    mock_session = _make_session(
+        _mock_response(LOGIN_PAGE_HTML),
+        _mock_response(POST_LOGIN_HTML),
+        _mock_response(TOPFRAME_HTML),
+        _mock_response(EXPIRED_LOANS_HTML),
+    )
+    with patch.object(client, "_new_session", return_value=mock_session):
+        with pytest.raises(LissyNoRenewableError, match="Tarif ist abgelaufen"):
+            await client.renew()
 
 
 async def test_renew_no_result_table_reports_failure():

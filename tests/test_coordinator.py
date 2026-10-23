@@ -49,6 +49,11 @@ def _with_renewals(items: list[dict], renewals: int | list[int]) -> list[dict]:
     return [{**item, "renewals": count} for item, count in zip(items, renewals)]
 
 
+def PAGE(loans):
+    """A list_loans() page mock: loans plus (empty) restrictions."""
+    return {"loans": loans, "restrictions": []}
+
+
 def _coordinator(hass: HomeAssistant, list_loans) -> LissyCoordinator:
     client = MagicMock()
     client.list_loans = list_loans
@@ -58,8 +63,21 @@ def _coordinator(hass: HomeAssistant, list_loans) -> LissyCoordinator:
 
 
 async def test_async_update_data_returns_loans(hass: HomeAssistant):
-    coord = _coordinator(hass, AsyncMock(return_value=LOANS))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE(LOANS)))
     assert await coord._async_update_data() == _with_renewals(LOANS, 0)
+
+
+async def test_async_update_data_sets_and_clears_restrictions(hass: HomeAssistant):
+    """Restrictions are stored beside the loans, refreshed on every fetch."""
+    page = {"loans": LOANS, "restrictions": ["Keine Fristverlängerung!"]}
+    coord = _coordinator(hass, AsyncMock(return_value=page))
+    assert await coord._async_update_data() == _with_renewals(LOANS, 0)
+    assert coord.restrictions == ("Keine Fristverlängerung!",)
+
+    # A later successful poll without restrictions clears the state.
+    coord.client.list_loans = AsyncMock(return_value=PAGE(list(LOANS)))
+    assert await coord._async_update_data() == _with_renewals(LOANS, 0)
+    assert coord.restrictions == ()
 
 
 async def test_async_update_data_auth_error_raises_config_entry_auth_failed(
@@ -88,7 +106,9 @@ async def test_async_update_data_connection_error_raises_update_failed(
 async def test_async_update_data_retries_transient_error_then_succeeds(
     hass: HomeAssistant,
 ):
-    list_loans = AsyncMock(side_effect=[LissyConnectionError("dns timeout"), LOANS])
+    list_loans = AsyncMock(
+        side_effect=[LissyConnectionError("dns timeout"), PAGE(LOANS)]
+    )
     coord = _coordinator(hass, list_loans)
     with patch(
         "custom_components.lissy.coordinator.asyncio.sleep",
@@ -113,7 +133,7 @@ async def test_due_date_move_persists_snapshot_with_incremented_count(
     hass: HomeAssistant,
 ):
     """A later due date on the first post-restart poll counts as a renewal."""
-    coord = _coordinator(hass, AsyncMock(return_value=LOANS_2))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE(LOANS_2)))
     coord.async_set_restored_data(_with_renewals(LOANS, 0))
     await hass.async_block_till_done()
 
@@ -127,7 +147,7 @@ async def test_due_date_move_persists_snapshot_with_incremented_count(
 
 
 async def test_downtime_renewal_adds_to_embedded_count(hass: HomeAssistant):
-    coord = _coordinator(hass, AsyncMock(return_value=LOANS_2))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE(LOANS_2)))
     coord.async_set_restored_data(_with_renewals(LOANS, 2))
     await hass.async_block_till_done()
 
@@ -141,7 +161,7 @@ async def test_downtime_renewal_adds_to_embedded_count(hass: HomeAssistant):
 
 
 async def test_update_skips_persist_when_data_unchanged(hass: HomeAssistant):
-    coord = _coordinator(hass, AsyncMock(return_value=list(LOANS)))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE(list(LOANS))))
     coord.async_set_restored_data(_with_renewals(LOANS, 0))
     await hass.async_block_till_done()
 
@@ -158,7 +178,7 @@ async def test_due_date_format_variant_is_not_counted_as_renewal(
     hass: HomeAssistant,
 ):
     coord = _coordinator(
-        hass, AsyncMock(return_value=[{**LOANS[0], "due_date": "30.6.2026"}])
+        hass, AsyncMock(return_value=PAGE([{**LOANS[0], "due_date": "30.6.2026"}]))
     )
     coord.async_set_restored_data(_with_renewals(LOANS, 0))
     await hass.async_block_till_done()
@@ -179,7 +199,7 @@ async def test_stale_backwards_due_date_move_is_not_counted_as_renewal(
     hass: HomeAssistant,
 ):
     """A scrape predating a concurrent renewal must not inflate the count."""
-    coord = _coordinator(hass, AsyncMock(return_value=list(LOANS)))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE(list(LOANS))))
     coord.async_set_restored_data(_with_renewals(LOANS_2, 4))
     await hass.async_block_till_done()
 
@@ -198,7 +218,7 @@ async def test_stale_backwards_due_date_move_is_not_counted_as_renewal(
 async def test_unparseable_previous_date_is_not_counted_as_renewal(
     hass: HomeAssistant,
 ):
-    coord = _coordinator(hass, AsyncMock(return_value=list(LOANS)))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE(list(LOANS))))
     coord.async_set_restored_data(_with_renewals([{**LOANS[0], "due_date": "—"}], 2))
     await hass.async_block_till_done()
 
@@ -214,7 +234,7 @@ async def test_unparseable_previous_date_is_not_counted_as_renewal(
 
 async def test_metadata_change_without_date_move_keeps_count(hass: HomeAssistant):
     renamed = [{**LOANS[0], "title": "Book One (2nd ed.)"}]
-    coord = _coordinator(hass, AsyncMock(return_value=renamed))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE(renamed)))
     coord.async_set_restored_data(_with_renewals(LOANS, 4))
     await hass.async_block_till_done()
 
@@ -234,7 +254,7 @@ async def test_returned_item_pruned_and_reborrow_starts_at_zero(
         {**LOANS[0], "media_id": "111"},
         {**LOANS[0], "media_id": "222", "title": "DVD Two"},
     ]
-    coord = _coordinator(hass, AsyncMock(return_value=[]))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE([])))
     coord.async_set_restored_data(_with_renewals(both, [3, 1]))
     await hass.async_block_till_done()
 
@@ -247,7 +267,7 @@ async def test_returned_item_pruned_and_reborrow_starts_at_zero(
 
         # Stand-in for the framework assigning the (empty) result.
         coord.async_set_restored_data([])
-        coord.client.list_loans = AsyncMock(return_value=[both[0]])  # re-borrow
+        coord.client.list_loans = AsyncMock(return_value=PAGE([both[0]]))  # re-borrow
         await coord._async_update_data()
         await hass.async_block_till_done()
         mock_save.assert_awaited_with([{**both[0], "renewals": 0}])
@@ -256,7 +276,7 @@ async def test_returned_item_pruned_and_reborrow_starts_at_zero(
 async def test_record_renewals_counts_authoritative_result_without_double_count(
     hass: HomeAssistant,
 ):
-    coord = _coordinator(hass, AsyncMock(return_value=[]))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE([])))
     coord.async_set_restored_data(_with_renewals(LOANS, 1))
 
     result = [{"media_id": "111", "renewed": True, "reason": ""}]
@@ -269,7 +289,7 @@ async def test_record_renewals_counts_authoritative_result_without_double_count(
 async def test_record_renewals_heuristic_catches_external_date_move(
     hass: HomeAssistant,
 ):
-    coord = _coordinator(hass, AsyncMock(return_value=[]))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE([])))
     coord.async_set_restored_data(_with_renewals(LOANS, 5))
 
     result = [{"media_id": "111", "renewed": False, "reason": "Nein"}]
@@ -283,7 +303,7 @@ async def test_record_renewals_leaves_unmoved_items_alone(hass: HomeAssistant):
         {**LOANS[0], "media_id": "111"},
         {**LOANS[0], "media_id": "222", "title": "DVD Two"},
     ]
-    coord = _coordinator(hass, AsyncMock(return_value=[]))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE([])))
     coord.async_set_restored_data(_with_renewals(items, [1, 7]))
 
     result = [
@@ -300,7 +320,7 @@ async def test_record_renewals_leaves_unmoved_items_alone(hass: HomeAssistant):
 
 
 async def test_async_renew_pushes_annotated_result(hass: HomeAssistant):
-    coord = _coordinator(hass, AsyncMock(return_value=[]))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE([])))
     coord.async_set_restored_data(_with_renewals(LOANS, 1))
     coord.client.renew = AsyncMock(
         return_value={
@@ -324,7 +344,7 @@ async def test_poll_cannot_run_mid_renew(hass: HomeAssistant):
     was pushed, counting the renewal heuristically, and the renew's
     authoritative increment stacks on top — one renewal, count +2.
     """
-    coord = _coordinator(hass, AsyncMock(return_value=list(LOANS_2)))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE(list(LOANS_2))))
     coord.async_set_restored_data(_with_renewals(LOANS, 0))
     await hass.async_block_till_done()
 
@@ -342,7 +362,7 @@ async def test_poll_cannot_run_mid_renew(hass: HomeAssistant):
 
     async def slow_list_loans():
         poll_started.set()  # only reachable once the renew released the lock
-        return list(LOANS_2)
+        return PAGE(list(LOANS_2))
 
     coord.client.renew = slow_renew
     coord.client.list_loans = slow_list_loans
@@ -368,7 +388,7 @@ async def test_poll_cannot_run_mid_renew(hass: HomeAssistant):
 async def test_annotation_never_mutates_caller_owned_input(hass: HomeAssistant):
     pristine_loans = copy.deepcopy(LOANS)
     pristine_loans_2 = copy.deepcopy(LOANS_2)
-    coord = _coordinator(hass, AsyncMock(return_value=copy.deepcopy(LOANS_2)))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE(copy.deepcopy(LOANS_2))))
     coord.async_set_restored_data(_with_renewals(LOANS, 0))
     await hass.async_block_till_done()
 
@@ -388,7 +408,7 @@ async def test_annotation_never_mutates_caller_owned_input(hass: HomeAssistant):
 
 
 async def test_set_updated_data_persists_pushed_counted_list(hass: HomeAssistant):
-    coord = _coordinator(hass, AsyncMock(return_value=[]))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE([])))
     coord.async_set_restored_data(_with_renewals(LOANS, 0))
     await hass.async_block_till_done()
 
@@ -402,7 +422,7 @@ async def test_set_updated_data_persists_pushed_counted_list(hass: HomeAssistant
 
 
 async def test_set_restored_data_does_not_persist(hass: HomeAssistant):
-    coord = _coordinator(hass, AsyncMock(return_value=[]))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE([])))
 
     with patch.object(
         coord._snapshot_store, "async_save", new=AsyncMock()
@@ -417,12 +437,12 @@ async def test_set_restored_data_does_not_persist(hass: HomeAssistant):
 async def test_snapshot_survives_across_coordinator_instances(
     hass: HomeAssistant,
 ):
-    coord_a = _coordinator(hass, AsyncMock(return_value=LOANS_2))
+    coord_a = _coordinator(hass, AsyncMock(return_value=PAGE(LOANS_2)))
     coord_a.async_set_restored_data(_with_renewals(LOANS, 0))
     await coord_a._async_update_data()
     await hass.async_block_till_done()
 
-    coord_b = _coordinator(hass, AsyncMock(return_value=[]))
+    coord_b = _coordinator(hass, AsyncMock(return_value=PAGE([])))
     loaded = await coord_b.async_load_snapshot()
 
     assert loaded == _with_renewals(LOANS_2, 1)
@@ -431,7 +451,7 @@ async def test_snapshot_survives_across_coordinator_instances(
 async def test_load_failure_logs_warning_and_starts_empty(
     hass: HomeAssistant, caplog: pytest.LogCaptureFixture
 ):
-    coord = _coordinator(hass, AsyncMock(return_value=[]))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE([])))
 
     with caplog.at_level(logging.WARNING):
         with patch.object(
@@ -445,7 +465,7 @@ async def test_load_failure_logs_warning_and_starts_empty(
 
 
 async def test_migrate_func_converts_v1_loans_to_counted(hass: HomeAssistant):
-    store = _coordinator(hass, AsyncMock(return_value=[]))._snapshot_store
+    store = _coordinator(hass, AsyncMock(return_value=PAGE([])))._snapshot_store
 
     migrated = await store._async_migrate_func(1, 1, copy.deepcopy(LOANS))
     assert migrated == _with_renewals(LOANS, 0)
@@ -461,13 +481,15 @@ async def test_v1_snapshot_file_is_migrated_on_load(hass: HomeAssistant):
     await legacy.async_save(list(LOANS))
     await hass.async_block_till_done()
 
-    loaded = await _coordinator(hass, AsyncMock(return_value=[])).async_load_snapshot()
+    loaded = await _coordinator(
+        hass, AsyncMock(return_value=PAGE([]))
+    ).async_load_snapshot()
 
     assert loaded == _with_renewals(LOANS, 0)
 
 
 async def test_shutdown_cancels_pending_persist_task(hass: HomeAssistant):
-    coord = _coordinator(hass, AsyncMock(return_value=LOANS_2))
+    coord = _coordinator(hass, AsyncMock(return_value=PAGE(LOANS_2)))
     coord.async_set_restored_data(_with_renewals(LOANS, 0))
 
     save_started = asyncio.Event()

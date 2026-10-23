@@ -26,7 +26,9 @@ USER_INPUT = {
 def _patch_client(list_loans=None):
     """Patch LissyClient so config flow validation doesn't hit the network."""
     client = AsyncMock()
-    client.list_loans = list_loans or AsyncMock(return_value=[])
+    client.list_loans = list_loans or AsyncMock(
+        return_value={"loans": [], "restrictions": []}
+    )
     return patch("custom_components.lissy.config_flow.LissyClient", return_value=client)
 
 
@@ -73,7 +75,7 @@ async def test_user_flow_errors(hass, exc, expected):
 async def test_user_flow_invalid_url(hass):
     """A base_url not ending in lissy/lissy.ly is rejected before any network call."""
     client = AsyncMock()
-    client.list_loans = AsyncMock(return_value=[])
+    client.list_loans = AsyncMock(return_value={"loans": [], "restrictions": []})
     with patch("custom_components.lissy.config_flow.LissyClient", return_value=client):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -236,7 +238,7 @@ async def test_options_flow_toggle_reloads_and_creates_barcode(hass):
     )
     entry.add_to_hass(hass)
     client = AsyncMock()
-    client.list_loans = AsyncMock(return_value=[])
+    client.list_loans = AsyncMock(return_value={"loans": [], "restrictions": []})
     client.card_number = None
 
     with patch("custom_components.lissy.LissyClient", return_value=client):
@@ -297,7 +299,7 @@ async def test_options_flow_disable_removes_barcode(hass):
     )
     entry.add_to_hass(hass)
     client = AsyncMock()
-    client.list_loans = AsyncMock(return_value=[])
+    client.list_loans = AsyncMock(return_value={"loans": [], "restrictions": []})
     client.card_number = None
 
     with patch("custom_components.lissy.LissyClient", return_value=client):
@@ -329,7 +331,7 @@ async def test_options_flow_accepts_scraped_number(hass):
     )
     entry.add_to_hass(hass)
     client = AsyncMock()
-    client.list_loans = AsyncMock(return_value=[])
+    client.list_loans = AsyncMock(return_value={"loans": [], "restrictions": []})
     client.card_number = "03505383"
 
     with patch("custom_components.lissy.LissyClient", return_value=client):
