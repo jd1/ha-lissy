@@ -14,6 +14,7 @@ from custom_components.lissy.api import (
     LissyConnectionError,
     LissyNotFoundError,
     LissyResponseError,
+    MediaType,
     _redact_tokens,
     _WARNED_TYPES,
     parse_leihfrist,
@@ -122,6 +123,56 @@ CHECKBOXES_HTML = """
   <input type="checkbox" name="mednr2" value="87654321"/>
 </form>
 </body></html>
+"""
+
+# Shape copied from a real portal loans dump (content anonymized): the
+# checkbox column in front, Benutzernr. with the leading zero, ZWSP
+# injected into cells, soft hyphens in notes, unclosed <TR>/<TH>/<TD>.
+REAL_SHAPED_LOANS_HTML = """
+<HTML><BODY>
+<H2 align=center><i>Benutzerkonto anzeigen</i></H2>
+<P> 
+<H4>Benutzernr.: 01234567</H4>
+<form name="form1" target="topframe" action = "/lissy/lissy.ly" method="post">
+<table border>
+<TR>
+<TH><font color="008080">Verl.</font>
+<TH><font color="008080">&nbsp;</font>
+<TH><font color="008080">Med.nr.</font>
+<TH><font color="008080">Kurztitel</font>
+<TH><font color="008080">Leihfr.</font>
+<TH><font color="008080">Hinweis</font>
+<TR>
+<TD align="center"><INPUT TYPE="checkbox" NAME="mednr0001" VALUE="11111122" TITLE="Medium verl&auml;ngern"></TD>
+<TD align=center><B><IMG SRC="/lissy/icosmall/buch.gif" BORDER="0" hspace="0" vspace="0" ALT=""></B></TD>
+<TD>1111&#x200b;1122</TD>
+<TD>Autor, Vorname: Ein Buchtitel</TD>
+<TD align=center>27.10.&#x200b;2026</TD>
+<TD>Keine Ver&shy;länge&shy;rung mehr mög&shy;lich!
+</TR>
+<TR>
+<TD align="center"><INPUT TYPE="checkbox" NAME="mednr0002" VALUE="21222233" TITLE="Medium verl&auml;ngern"></TD>
+<TD align=center><B><IMG SRC="/lissy/icosmall/dvd.gif" BORDER="0" hspace="0" vspace="0" ALT=""></B></TD>
+<TD>2122&#x200b;2233</TD>
+<TD>Ein DVD-Titel / DVD</TD>
+<TD align=center>05.11.&#x200b;2026</TD>
+<TD align=center>---
+</TR>
+</table>
+<INPUT NAME="pg" TYPE="hidden" VALUE="verlaeng">
+<INPUT NAME="c" TYPE="hidden" VALUE="redactedtoken">
+<INPUT NAME="medcnt" TYPE="hidden" VALUE="2">
+<INPUT TYPE="submit" VALUE="Ausgewählte Medien verlängern">
+</form>
+<form target="topframe" action = "/lissy/lissy.ly" method="post">
+<INPUT NAME="pg" TYPE="hidden" VALUE="verlaeng">
+<INPUT NAME="c" TYPE="hidden" VALUE="redactedtoken">
+<INPUT NAME="medcnt" TYPE="hidden" VALUE="2">
+<INPUT NAME="mednr0001" TYPE="hidden" VALUE="11111122">
+<INPUT NAME="mednr0002" TYPE="hidden" VALUE="21222233">
+<INPUT TYPE="submit" VALUE="Alle Medien verlängern">
+</form>
+</BODY></HTML>
 """
 
 
@@ -372,6 +423,35 @@ async def test_list_loans_scrapes_card_number():
         await client.list_loans()
 
     assert client.card_number == "03505383"
+
+
+async def test_real_shaped_loans_page_parses():
+    """Regression on a real portal dump: checkbox column, Benutzernr.
+    label with leading zero, ZWSP and soft hyphens in cells, unclosed
+    TR/TH/TD, and hidden 'Alle Medien verlängern' inputs that must not
+    show up as extra checkboxes."""
+    client = LissyClient("01234567", "pin", "http://x/lissy/lissy.ly")
+    mock_session = _make_session(
+        _mock_response(LOGIN_PAGE_HTML),
+        _mock_response(POST_LOGIN_HTML),
+        _mock_response(TOPFRAME_HTML),
+        _mock_response(REAL_SHAPED_LOANS_HTML),
+    )
+    with patch.object(client, "_new_session", return_value=mock_session):
+        loans = await client.list_loans()
+
+    assert client.card_number == "01234567"
+    assert len(loans) == 2
+    assert loans[0]["media_id"] == "11111122"
+    assert loans[0]["media_type"] == MediaType.BOOK
+    assert "Verlänge" in loans[0]["note"].replace("\xad", "")
+    assert loans[1]["media_id"] == "21222233"
+    assert loans[1]["media_type"] == MediaType.DVD
+    assert loans[1]["note"] == "---"
+
+    # The second form's hidden mednr inputs dedup against the checkboxes.
+    boxes = LissyClient._parse_checkboxes(REAL_SHAPED_LOANS_HTML)
+    assert [b["value"] for b in boxes] == ["11111122", "21222233"]
 
 
 # ---------------------------------------------------------------------------
