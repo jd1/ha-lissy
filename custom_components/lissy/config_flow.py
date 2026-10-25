@@ -47,14 +47,23 @@ STEP_SCHEMA = probatio.Schema(
         probatio.Required("base_url"): TextSelector(
             TextSelectorConfig(type=TextSelectorType.URL)
         ),
+        probatio.Required(
+            CONF_SHOW_BARCODE, default=DEFAULT_SHOW_BARCODE
+        ): BooleanSelector(),
     }
 )
 
 
 async def _validate_credentials(
     hass: HomeAssistant, user_input: dict[str, Any]
-) -> dict[str, str]:
-    """Return a form errors dict (field -> error key), empty if credentials work."""
+) -> tuple[dict[str, str], str]:
+    """Validate credentials; return (form errors, scraped card number).
+
+    The card number is ``""`` unless the login already succeeded: the
+    loans round-trip is what surfaces the portal's canonical number
+    (leading zero included), and the config flow needs it to decide
+    upfront whether the barcode option is encodable.
+    """
     client = LissyClient(
         user_input["username"],
         user_input["password"],
@@ -64,10 +73,10 @@ async def _validate_credentials(
     try:
         await client.list_loans()
     except LissyAuthError:
-        return {"base": "invalid_auth"}
+        return {"base": "invalid_auth"}, ""
     except LissyConnectionError:
-        return {"base": "cannot_connect"}
-    return {}
+        return {"base": "cannot_connect"}, ""
+    return {}, client.card_number or ""
 
 
 class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -83,12 +92,20 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input=None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
+        card_number = ""
         if user_input is not None:
             user_input["username"] = user_input["username"].strip()
             if not user_input["base_url"].rstrip("/").endswith(URL_SUFFIX):
                 errors = {"base_url": "invalid_url"}
             else:
-                errors = await _validate_credentials(self.hass, user_input)
+                errors, card_number = await _validate_credentials(self.hass, user_input)
+            if not errors and user_input[CONF_SHOW_BARCODE]:
+                # Local import keeps barcode/Pillow out of the config-flow
+                # import path when the barcode isn't requested.
+                from .image import code39_value
+
+                if code39_value(card_number or user_input["username"]) is None:
+                    errors = {"base": "barcode_unencodable"}
             if not errors:
                 await self.async_set_unique_id(
                     _unique_id_for(user_input["username"], user_input["base_url"])
@@ -108,9 +125,17 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         continue
                     if _portal_host(entry.data.get("base_url", "")) == host:
                         return self.async_abort(reason="already_configured")
+                # Credentials stay in entry.data; the barcode toggle is a
+                # user preference and belongs in options, where the options
+                # flow and the image platform read it.
                 return self.async_create_entry(
                     title=f"Lissy ({user_input['username']})",
-                    data=user_input,
+                    data={
+                        key: value
+                        for key, value in user_input.items()
+                        if key != CONF_SHOW_BARCODE
+                    },
+                    options={CONF_SHOW_BARCODE: user_input[CONF_SHOW_BARCODE]},
                 )
 
         return self.async_show_form(
@@ -127,7 +152,7 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         reauth_entry = self._get_reauth_entry()
         if user_input is not None:
             merged = {**reauth_entry.data, "password": user_input["password"]}
-            errors = await _validate_credentials(self.hass, merged)
+            errors, _ = await _validate_credentials(self.hass, merged)
             if not errors:
                 await self.async_set_unique_id(reauth_entry.unique_id)
                 self._abort_if_unique_id_mismatch()
