@@ -6,10 +6,12 @@
         "data": {
           "username": "Ausweisnummer",
           "password": "PIN / Passwort",
-          "base_url": "Lissy URL"
+          "base_url": "Lissy URL",
+          "show_barcode": "Bibliotheksausweis als Barcode anzeigen"
         },
         "data_description": {
-          "base_url": "Muss auf lissy/lissy.ly enden"
+          "base_url": "Muss auf lissy/lissy.ly enden",
+          "show_barcode": "Erstellt eine Bild-Entität, die die Ausweisnummer als Code39-Barcode darstellt, sodass sie an der Bibliothekstheke gescannt werden kann. Kleinbuchstaben werden als Großbuchstaben kodiert."
         }
       },
       "reauth_confirm": {
@@ -23,7 +25,8 @@
     "error": {
       "invalid_auth": "Ungültige Anmeldedaten",
       "cannot_connect": "Verbindung zum Bibliotheksportal fehlgeschlagen",
-      "invalid_url": "Die URL muss auf lissy/lissy.ly enden"
+      "invalid_url": "Die URL muss auf lissy/lissy.ly enden",
+      "barcode_unencodable": "Die Ausweisnummer enthält Zeichen, die nicht als Code39 kodiert werden können (nach Großschreibung erlaubt: A-Z, 0-9, Leerzeichen sowie - . $ / + %)."
     },
     "abort": {
       "already_configured": "Dieses Bibliothekskonto ist bereits eingerichtet",

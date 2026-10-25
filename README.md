@@ -35,7 +35,8 @@ During setup you will be asked for:
 |---|---|
 | Username | Your library account username |
 | Password | Your library account password |
-| Base URL | URL of your Lissy portal (optional if using the default) |
+| Base URL | URL of your Lissy portal (must end with `lissy/lissy.ly`) |
+| Show library card barcode | Optional toggle; when enabled the image entity (`image.…_barcode`) is created with the entry and can be turned off later under Options |
 
 ## Options
 
@@ -43,7 +44,7 @@ Open **Settings → Devices & Services → Lissy → Configure**:
 
 | Option | Description |
 |---|---|
-| Show library card barcode | Off by default. When enabled, an image entity (`image.…_barcode`) is created that renders the number encoded on your library card — the portal's canonical number (leading zeros included) when the portal displays it, otherwise the configured username. Lowercase letters are encoded as uppercase; numbers containing characters outside the Code39 alphabet (A-Z, 0-9, space, `- . $ / + %`) are rejected and the entity is not created. |
+| Show library card barcode | Off by default, also offered during initial setup. When enabled, an image entity (`image.…_barcode`) is created that renders the number encoded on your library card — the portal's canonical number (leading zeros included) when the portal displays it, otherwise the configured username. Lowercase letters are encoded as uppercase; numbers containing characters outside the Code39 alphabet (A-Z, 0-9, space, `- . $ / + %`) are rejected and the entity is not created. |
 
 ## Services
 

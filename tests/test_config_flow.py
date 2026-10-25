@@ -23,12 +23,17 @@ USER_INPUT = {
 }
 
 
-def _patch_client(list_loans=None):
-    """Patch LissyClient so config flow validation doesn't hit the network."""
+def _patch_client(list_loans=None, card_number=None):
+    """Patch LissyClient so config flow validation doesn't hit the network.
+
+    ``card_number`` mirrors what a real login scrapes from the portal
+    (None until a loans round-trip succeeds).
+    """
     client = AsyncMock()
     client.list_loans = list_loans or AsyncMock(
         return_value={"loans": [], "restrictions": []}
     )
+    client.card_number = card_number
     return patch("custom_components.lissy.config_flow.LissyClient", return_value=client)
 
 
@@ -70,6 +75,70 @@ async def test_user_flow_errors(hass, exc, expected):
 
     assert result["type"] == FlowResultType.FORM
     assert result["errors"] == {"base": expected}
+
+
+async def test_user_flow_barcode_default_off(hass):
+    """The initial form includes the toggle; unset it stays off."""
+    with _patch_client():
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], USER_INPUT
+        )
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["result"].options == {"show_barcode": False}
+    # The credentials keep living in data; the toggle never does.
+    assert "show_barcode" not in result["result"].data
+
+
+async def test_user_flow_barcode_on(hass):
+    """Toggling the barcode at setup lands in entry options, not data."""
+    user_input = {**USER_INPUT, "show_barcode": True}
+    with _patch_client(card_number="03505383"):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input
+        )
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["result"].options == {"show_barcode": True}
+    assert result["data"] == USER_INPUT
+
+
+async def test_user_flow_barcode_unencodable(hass):
+    """Enabling the barcode with an unencodable number blocks setup."""
+    user_input = {**USER_INPUT, "username": "12ä34", "show_barcode": True}
+    with _patch_client():
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input
+        )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "user"
+    assert result["errors"] == {"base": "barcode_unencodable"}
+
+
+async def test_user_flow_barcode_validates_scraped_number(hass):
+    """An unencodable username with an encodable portal number passes."""
+    user_input = {**USER_INPUT, "username": "12ä34", "show_barcode": True}
+    with _patch_client(card_number="03505383"):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input
+        )
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["result"].options == {"show_barcode": True}
+    assert result["data"]["username"] == "12ä34"
 
 
 async def test_user_flow_invalid_url(hass):
