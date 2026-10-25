@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/jd1/ha-lissy/compare/v0.7.0...v0.7.1) (2026-10-25)
+
+
+### Bug Fixes
+
+* **api:** parse loans when the renewal checkbox column is missing ([c90c7a4](https://github.com/jd1/ha-lissy/commit/c90c7a4b5fce7360a38b484097fafaded2ebca43))
+
 ## [0.7.0](https://github.com/jd1/ha-lissy/compare/v0.6.0...v0.7.0) (2026-10-23)
 
 
