@@ -6,10 +6,12 @@
         "data": {
           "username": "Library card number",
           "password": "PIN / Password",
-          "base_url": "Lissy URL"
+          "base_url": "Lissy URL",
+          "show_barcode": "Show library card barcode"
         },
         "data_description": {
-          "base_url": "Must end with lissy/lissy.ly"
+          "base_url": "Must end with lissy/lissy.ly",
+          "show_barcode": "Creates an image entity that renders your library card number as a Code39 barcode, so it can be scanned at the library desk. Lowercase letters are encoded as uppercase."
         }
       },
       "reauth_confirm": {
@@ -23,7 +25,8 @@
     "error": {
       "invalid_auth": "Invalid credentials",
       "cannot_connect": "Cannot connect to library portal",
-      "invalid_url": "The URL must end with lissy/lissy.ly"
+      "invalid_url": "The URL must end with lissy/lissy.ly",
+      "barcode_unencodable": "The account number contains characters that cannot be encoded as Code39 (allowed after uppercasing: A-Z, 0-9, space and - . $ / + %)."
     },
     "abort": {
       "already_configured": "This library account is already configured",
