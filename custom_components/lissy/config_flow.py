@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any
-from urllib.parse import urlsplit
 
 import probatio
 from homeassistant import config_entries
@@ -13,6 +12,9 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     BooleanSelector,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -20,32 +22,40 @@ from homeassistant.helpers.selector import (
 
 from .api import LissyAuthError, LissyClient, LissyConnectionError
 from .const import CONF_SHOW_BARCODE, DEFAULT_SHOW_BARCODE, DOMAIN, URL_SUFFIX
+from .libraries import (
+    LIBRARIES,
+    MANUAL_SLUG,
+    SELECT_OPTIONS,
+    library_for_url,
+    normalize_portal_url,
+)
 
+_STEP_USER_SCHEMA = probatio.Schema(
+    {
+        probatio.Required("library"): SelectSelector(
+            SelectSelectorConfig(
+                options=SELECT_OPTIONS,
+                translation_key="library",
+                mode=SelectSelectorMode.DROPDOWN,
+                sort=False,
+            )
+        )
+    }
+)
 
-def _portal_host(base_url: str) -> str:
-    """Return the portal host, falling back to the raw URL if unparseable."""
-    return urlsplit(base_url).hostname or base_url
+_STEP_MANUAL_SCHEMA = probatio.Schema(
+    {
+        probatio.Required("base_url"): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.URL)
+        )
+    }
+)
 
-
-def _unique_id_for(username: str, base_url: str) -> str:
-    """Return ``username@<portal host>``.
-
-    The path is constant across every Lissy portal (the flow rejects any
-    base_url not ending in ``lissy/lissy.ly``), so the host carries all
-    the discrimination between libraries: the same card number may exist
-    at two portals and must yield two entries.
-    """
-    return f"{username}@{_portal_host(base_url)}"
-
-
-STEP_SCHEMA = probatio.Schema(
+_STEP_LOGIN_SCHEMA = probatio.Schema(
     {
         probatio.Required("username"): str,
         probatio.Required("password"): TextSelector(
             TextSelectorConfig(type=TextSelectorType.PASSWORD)
-        ),
-        probatio.Required("base_url"): TextSelector(
-            TextSelectorConfig(type=TextSelectorType.URL)
         ),
     }
 )
@@ -73,6 +83,15 @@ async def _validate_credentials(
 class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 2
 
+    def __init__(self) -> None:
+        """Initialize flow state.
+
+        In-progress config flows are not persisted across HA restarts, so a
+        plain attribute is sufficient to carry the chosen base URL between
+        the selection and login steps.
+        """
+        self._base_url: str | None = None
+
     @staticmethod
     @callback
     def async_get_options_flow(
@@ -81,40 +100,88 @@ class LissyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Create the options flow handler."""
         return LissyOptionsFlow()
 
-    async def async_step_user(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            user_input["username"] = user_input["username"].strip()
+            slug = user_input["library"]
+            if slug == MANUAL_SLUG:
+                return await self.async_step_manual()
+            library = LIBRARIES.get(slug)
+            if library is None:
+                # Unreachable through the selector's own validation.
+                errors = {"library": "unknown_library"}
+            else:
+                self._base_url = library["url"]
+                return await self.async_step_login()
+
+        return self.async_show_form(
+            step_id="user", data_schema=_STEP_USER_SCHEMA, errors=errors
+        )
+
+    async def async_step_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Collect the portal URL when the library is not in the dropdown."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
             if not user_input["base_url"].rstrip("/").endswith(URL_SUFFIX):
                 errors = {"base_url": "invalid_url"}
             else:
-                errors = await _validate_credentials(self.hass, user_input)
+                self._base_url = user_input["base_url"]
+                return await self.async_step_login()
+
+        return self.async_show_form(
+            step_id="manual", data_schema=_STEP_MANUAL_SCHEMA, errors=errors
+        )
+
+    async def async_step_login(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            base_url = self._base_url
+            if base_url is None:
+                # Defensive: unreachable through the normal step sequence —
+                # login is only entered after user/manual set the base URL.
+                return await self.async_step_user()
+            user_input["username"] = user_input["username"].strip()
+            merged = {**user_input, "base_url": base_url}
+            errors = await _validate_credentials(self.hass, merged)
             if not errors:
-                await self.async_set_unique_id(
-                    _unique_id_for(user_input["username"], user_input["base_url"])
-                )
+                # ``<username>@<host><path>``: one card number may exist at
+                # two portals (and at two biblis.de-hosted ones that differ
+                # only in path), and HA never rewrites a configured entry's
+                # unique id, so new entries must discriminate on host AND
+                # path. Scheme and trailing slash are normalized away so
+                # spelling drift does not spawn a duplicate of the same
+                # account.
+                username = user_input["username"]
+                normalized = normalize_portal_url(base_url)
+                await self.async_set_unique_id(f"{username}@{normalized}")
                 self._abort_if_unique_id_configured()
                 # Entries created before multi-library support keep their
-                # username-only unique id — HA never rewrites a configured
-                # entry's unique id — so match them on their data instead
-                # of treating a re-add as a new account. Comparing portal
-                # hosts rather than raw urls keeps spelling drift such as
-                # a scheme change or trailing slash from spawning a
-                # duplicate of the same account.
-                username = user_input["username"]
-                host = _portal_host(user_input["base_url"])
+                # username-only (and later username@host) unique ids — match
+                # them on their data instead of treating a re-add as a new
+                # account.
                 for entry in self.hass.config_entries.async_entries(DOMAIN):
                     if entry.data.get("username") != username:
                         continue
-                    if _portal_host(entry.data.get("base_url", "")) == host:
+                    if (
+                        normalize_portal_url(entry.data.get("base_url", ""))
+                        == normalized
+                    ):
                         return self.async_abort(reason="already_configured")
-                return self.async_create_entry(
-                    title=f"Lissy ({user_input['username']})",
-                    data=user_input,
+                title: str = (
+                    f"{name} ({username})"
+                    if (name := library_for_url(base_url))
+                    else f"Lissy ({username})"
                 )
+                return self.async_create_entry(title=title, data=merged)
 
         return self.async_show_form(
-            step_id="user", data_schema=STEP_SCHEMA, errors=errors
+            step_id="login", data_schema=_STEP_LOGIN_SCHEMA, errors=errors
         )
 
     async def async_step_reauth(

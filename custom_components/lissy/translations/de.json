@@ -2,20 +2,33 @@
   "config": {
     "step": {
       "user": {
-        "title": "Lissy Bibliothek Anmeldung",
+        "title": "Lissy Bibliothek",
         "data": {
-          "username": "Ausweisnummer",
-          "password": "PIN / Passwort",
+          "library": "Bibliothek"
+        },
+        "data_description": {
+          "library": "Wähle deine Bibliothek aus der Liste oder wähle manuelle Eingabe, um die Lissy-URL selbst einzutragen."
+        }
+      },
+      "manual": {
+        "title": "Lissy Bibliothek URL",
+        "data": {
           "base_url": "Lissy URL"
         },
         "data_description": {
           "base_url": "Muss auf lissy/lissy.ly enden"
         }
       },
-      "reauth_confirm": {
+      "login": {
         "title": "Lissy Bibliothek Anmeldung",
         "data": {
           "username": "Ausweisnummer",
+          "password": "PIN / Passwort"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Lissy Bibliothek Anmeldung",
+        "data": {
           "password": "PIN / Passwort"
         }
       }
@@ -23,7 +36,8 @@
     "error": {
       "invalid_auth": "Ungültige Anmeldedaten",
       "cannot_connect": "Verbindung zum Bibliotheksportal fehlgeschlagen",
-      "invalid_url": "Die URL muss auf lissy/lissy.ly enden"
+      "invalid_url": "Die URL muss auf lissy/lissy.ly enden",
+      "unknown_library": "Unbekannte Bibliotheksauswahl"
     },
     "abort": {
       "already_configured": "Dieses Bibliothekskonto ist bereits eingerichtet",
@@ -45,6 +59,35 @@
     },
     "error": {
       "barcode_unencodable": "Die Ausweisnummer enthält Zeichen, die nicht als Code39 kodiert werden können (nach Großschreibung erlaubt: A-Z, 0-9, Leerzeichen sowie - . $ / + %)."
+    }
+  },
+  "selector": {
+    "library": {
+      "options": {
+        "aichach": "Stadtbücherei Aichach",
+        "aidlingen": "Ortsbücherei Aidlingen",
+        "auerbach": "Stadtbibliothek Auerbach",
+        "bad_saulgau": "Stadtbücherei Bad Saulgau",
+        "bad_waldsee": "Stadtbücherei Bad Waldsee",
+        "biblis_blaustein": "Stadtbücherei Blaustein",
+        "biblis_gerstetten": "Bibliothek Gerstetten",
+        "biblis_sontheim": "Ortsbücherei Sontheim/Brz.",
+        "blaubeuren": "Stadtbücherei Blaubeuren",
+        "dossenheim": "Gemeindebücherei Dossenheim",
+        "ehingen": "Stadtbücherei Ehingen",
+        "giengen": "Stadtbibliothek Giengen",
+        "langenargen": "Bücherei im Münzhof, Langenargen",
+        "leutkirch": "Stadtbibliothek Leutkirch",
+        "meersburg": "Stadtbücherei Meersburg",
+        "passau": "Europabücherei Passau",
+        "schelklingen": "Stadtbücherei Schelklingen",
+        "schwaebisch_gmuend": "Stadtbibliothek Schwäbisch Gmünd",
+        "straubenhardt": "Gemeindebibliothek Straubenhardt",
+        "tettnang": "Stadtbücherei Tettnang",
+        "waldenbuch": "Stadtbücherei Waldenbuch",
+        "wangen": "Stadtbücherei im Kornhaus, Wangen im Allgäu",
+        "manual": "URL manuell eingeben"
+      }
     }
   },
   "services": {

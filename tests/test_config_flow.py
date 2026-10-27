@@ -15,12 +15,18 @@ from custom_components.lissy.api import (
     LissyResponseError,
 )
 from custom_components.lissy.const import DOMAIN
+from custom_components.lissy.libraries import LIBRARIES
 
-USER_INPUT = {
+LOGIN_INPUT = {"username": "12345", "password": "secret"}
+
+LEGACY_INPUT = {
     "username": "12345",
     "password": "secret",
     "base_url": "http://x/lissy/lissy.ly",
 }
+
+AICHACH_URL = LIBRARIES["aichach"]["url"]
+GERSTETTEN_URL = LIBRARIES["biblis_gerstetten"]["url"]
 
 
 def _patch_client(list_loans=None):
@@ -32,21 +38,66 @@ def _patch_client(list_loans=None):
     return patch("custom_components.lissy.config_flow.LissyClient", return_value=client)
 
 
-async def test_user_flow_success(hass):
+async def _pick_library(hass, slug: str):
+    """Start a flow and submit the library selection step."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "user"
+    return await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"library": slug}
+    )
+
+
+async def test_user_flow_picks_library_success(hass):
+    """Selecting a library from the dropdown skips the URL step."""
     with _patch_client():
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_USER}
-        )
+        result = await _pick_library(hass, "aichach")
         assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "login"
 
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], USER_INPUT
+            result["flow_id"], LOGIN_INPUT
         )
 
     assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert result["result"].unique_id == "12345@x"
+    assert result["title"] == "Stadtbücherei Aichach (12345)"
+    assert result["result"].unique_id == (
+        "12345@lissy.stadtbuecherei-aichach.de/lissy/lissy.ly"
+    )
+    assert result["data"] == {
+        "username": "12345",
+        "password": "secret",
+        "base_url": AICHACH_URL,
+    }
+
+
+async def test_manual_flow_success(hass):
+    """The manual path asks for the URL and still requests credentials."""
+    with _patch_client():
+        result = await _pick_library(hass, "manual")
+        assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "manual"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"base_url": "http://x/lissy/lissy.ly"}
+        )
+        assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "login"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], LOGIN_INPUT
+        )
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["title"] == "Lissy (12345)"
-    assert result["data"] == USER_INPUT
+    assert result["result"].unique_id == "12345@x/lissy/lissy.ly"
+    assert result["data"] == {
+        "username": "12345",
+        "password": "secret",
+        "base_url": "http://x/lissy/lissy.ly",
+    }
 
 
 @pytest.mark.parametrize(
@@ -60,46 +111,51 @@ async def test_user_flow_success(hass):
     ],
 )
 async def test_user_flow_errors(hass, exc, expected):
+    """Credential errors from the dropdown path surface on the login step."""
     with _patch_client(list_loans=AsyncMock(side_effect=exc)):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_USER}
-        )
+        result = await _pick_library(hass, "aichach")
+        assert result["step_id"] == "login"
+
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], USER_INPUT
+            result["flow_id"], LOGIN_INPUT
         )
 
     assert result["type"] == FlowResultType.FORM
     assert result["errors"] == {"base": expected}
 
 
-async def test_user_flow_invalid_url(hass):
+async def test_manual_flow_invalid_url(hass):
     """A base_url not ending in lissy/lissy.ly is rejected before any network call."""
     client = AsyncMock()
     client.list_loans = AsyncMock(return_value={"loans": [], "restrictions": []})
     with patch("custom_components.lissy.config_flow.LissyClient", return_value=client):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_USER}
-        )
+        result = await _pick_library(hass, "manual")
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"],
-            {"username": "12345", "password": "secret", "base_url": "http://x"},
+            result["flow_id"], {"base_url": "http://x"}
         )
 
     assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "manual"
     assert result["errors"] == {"base_url": "invalid_url"}
     client.list_loans.assert_not_awaited()
 
 
-async def test_duplicate_aborts(hass):
-    """A pre-multi-library entry (username-only id) still blocks a re-add."""
-    MockConfigEntry(domain=DOMAIN, unique_id="12345", data=USER_INPUT).add_to_hass(hass)
+async def test_dropdown_duplicate_aborts(hass):
+    """A historical username-only id still blocks a same-portal re-add."""
+    MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="12345",
+        data={
+            "username": "12345",
+            "password": "secret",
+            "base_url": AICHACH_URL,
+        },
+    ).add_to_hass(hass)
 
     with _patch_client():
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_USER}
-        )
+        result = await _pick_library(hass, "aichach")
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], USER_INPUT
+            result["flow_id"], LOGIN_INPUT
         )
 
     assert result["type"] == FlowResultType.ABORT
@@ -107,7 +163,7 @@ async def test_duplicate_aborts(hass):
 
 
 async def test_legacy_duplicate_ignores_scheme_and_trailing_slash(hass):
-    """The legacy match compares portal hosts, not raw url spellings."""
+    """The legacy match compares normalized portal URLs, not raw spellings."""
     MockConfigEntry(
         domain=DOMAIN,
         unique_id="12345",
@@ -119,12 +175,12 @@ async def test_legacy_duplicate_ignores_scheme_and_trailing_slash(hass):
     ).add_to_hass(hass)
 
     with _patch_client():
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_USER}
-        )
-        # http vs https and the missing trailing slash must not matter.
+        result = await _pick_library(hass, "manual")
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], USER_INPUT
+            result["flow_id"], {"base_url": "http://x/lissy/lissy.ly"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], LOGIN_INPUT
         )
 
     assert result["type"] == FlowResultType.ABORT
@@ -132,56 +188,58 @@ async def test_legacy_duplicate_ignores_scheme_and_trailing_slash(hass):
 
 
 async def test_new_scheme_duplicate_aborts(hass):
-    """Re-adding an account created under username@host aborts by unique id."""
-    MockConfigEntry(domain=DOMAIN, unique_id="12345@x", data=USER_INPUT).add_to_hass(
-        hass
+    """Re-adding an account created under username@host/path aborts on unique id."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="12345@x/lissy/lissy.ly",
+        data={
+            "username": "12345",
+            "password": "secret",
+            "base_url": "http://x/lissy/lissy.ly",
+        },
     )
+    entry.add_to_hass(hass)
 
     with _patch_client():
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        result = await _pick_library(hass, "manual")
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"base_url": "http://x/lissy/lissy.ly"}
         )
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], USER_INPUT
+            result["flow_id"], LOGIN_INPUT
         )
 
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "already_configured"
 
 
-async def test_same_username_at_second_library_is_allowed(hass):
-    """One card number at two portals yields two entries."""
+async def test_same_username_at_second_biblis_library_is_allowed(hass):
+    """Regression: biblis.de hosts four libraries differing only by path."""
     MockConfigEntry(
         domain=DOMAIN,
-        unique_id="12345",
+        unique_id="12345@biblis.de/bls/lissy/lissy.ly",
         data={
             "username": "12345",
             "password": "secret",
-            "base_url": "http://x/lissy/lissy.ly",
+            "base_url": LIBRARIES["biblis_blaustein"]["url"],
         },
     ).add_to_hass(hass)
 
-    other_library = {
-        "username": "12345",
-        "password": "secret",
-        "base_url": "http://other.example.com/lissy/lissy.ly",
-    }
     with _patch_client():
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_USER}
-        )
+        result = await _pick_library(hass, "biblis_gerstetten")
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], other_library
+            result["flow_id"], LOGIN_INPUT
         )
 
     assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert result["result"].unique_id == "12345@other.example.com"
-    assert result["data"] == other_library
+    assert result["title"] == "Bibliothek Gerstetten (12345)"
+    assert result["result"].unique_id == "12345@biblis.de/ger/lissy/lissy.ly"
+    assert result["data"]["base_url"] == GERSTETTEN_URL
 
 
 async def test_reauth_flow_updates_password(hass):
     """M1: reauth updates credentials on the existing entry."""
-    entry = MockConfigEntry(domain=DOMAIN, unique_id="12345", data=USER_INPUT)
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="12345", data=LEGACY_INPUT)
     entry.add_to_hass(hass)
 
     result = await entry.start_reauth_flow(hass)
@@ -201,7 +259,7 @@ async def test_reauth_flow_updates_password(hass):
 
 
 async def test_reauth_flow_invalid_auth(hass):
-    entry = MockConfigEntry(domain=DOMAIN, unique_id="12345", data=USER_INPUT)
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="12345", data=LEGACY_INPUT)
     entry.add_to_hass(hass)
 
     result = await entry.start_reauth_flow(hass)
@@ -216,7 +274,7 @@ async def test_reauth_flow_invalid_auth(hass):
 
 async def test_options_flow_defaults_to_false(hass):
     """The options flow shows the barcode toggle, default off."""
-    entry = MockConfigEntry(domain=DOMAIN, unique_id="12345", data=USER_INPUT)
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="12345", data=LEGACY_INPUT)
     entry.add_to_hass(hass)
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
@@ -234,7 +292,7 @@ async def test_options_flow_toggle_reloads_and_creates_barcode(hass):
         domain=DOMAIN,
         unique_id="12345",
         title="Lissy (12345)",
-        data=USER_INPUT,
+        data=LEGACY_INPUT,
     )
     entry.add_to_hass(hass)
     client = AsyncMock()
@@ -294,7 +352,7 @@ async def test_options_flow_disable_removes_barcode(hass):
         domain=DOMAIN,
         unique_id="12345",
         title="Lissy (12345)",
-        data=USER_INPUT,
+        data=LEGACY_INPUT,
         options={"show_barcode": True},
     )
     entry.add_to_hass(hass)
