@@ -2,20 +2,33 @@
   "config": {
     "step": {
       "user": {
-        "title": "Lissy Library Login",
+        "title": "Lissy Library",
         "data": {
-          "username": "Library card number",
-          "password": "PIN / Password",
+          "library": "Library"
+        },
+        "data_description": {
+          "library": "Choose your library from the list, or select manual entry to enter the Lissy URL yourself."
+        }
+      },
+      "manual": {
+        "title": "Lissy Library URL",
+        "data": {
           "base_url": "Lissy URL"
         },
         "data_description": {
           "base_url": "Must end with lissy/lissy.ly"
         }
       },
-      "reauth_confirm": {
+      "login": {
         "title": "Lissy Library Login",
         "data": {
           "username": "Library card number",
+          "password": "PIN / Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Lissy Library Login",
+        "data": {
           "password": "PIN / Password"
         }
       }
@@ -23,12 +36,58 @@
     "error": {
       "invalid_auth": "Invalid credentials",
       "cannot_connect": "Cannot connect to library portal",
-      "invalid_url": "The URL must end with lissy/lissy.ly"
+      "invalid_url": "The URL must end with lissy/lissy.ly",
+      "unknown_library": "Unknown library selection"
     },
     "abort": {
       "already_configured": "This library account is already configured",
       "already_in_progress": "Configuration is already in progress",
       "reauth_successful": "Re-authentication was successful"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Lissy Library options",
+        "data": {
+          "show_barcode": "Show library card as barcode"
+        },
+        "data_description": {
+          "show_barcode": "Creates an image entity that renders the card number as a Code39 barcode so it can be scanned at the library desk. Lowercase letters are encoded as uppercase."
+        }
+      }
+    },
+    "error": {
+      "barcode_unencodable": "The card number contains characters that cannot be encoded as Code39 (allowed after uppercasing: A-Z, 0-9, spaces and - . $ / + %)."
+    }
+  },
+  "selector": {
+    "library": {
+      "options": {
+        "aichach": "Stadtbücherei Aichach",
+        "aidlingen": "Ortsbücherei Aidlingen",
+        "auerbach": "Stadtbibliothek Auerbach",
+        "bad_saulgau": "Stadtbücherei Bad Saulgau",
+        "bad_waldsee": "Stadtbücherei Bad Waldsee",
+        "biblis_blaustein": "Stadtbücherei Blaustein",
+        "biblis_gerstetten": "Bibliothek Gerstetten",
+        "biblis_sontheim": "Ortsbücherei Sontheim/Brz.",
+        "blaubeuren": "Stadtbücherei Blaubeuren",
+        "dossenheim": "Gemeindebücherei Dossenheim",
+        "ehingen": "Stadtbücherei Ehingen",
+        "giengen": "Stadtbibliothek Giengen",
+        "langenargen": "Bücherei im Münzhof, Langenargen",
+        "leutkirch": "Stadtbibliothek Leutkirch",
+        "meersburg": "Stadtbücherei Meersburg",
+        "passau": "Europabücherei Passau",
+        "schelklingen": "Stadtbücherei Schelklingen",
+        "schwaebisch_gmuend": "Stadtbibliothek Schwäbisch Gmünd",
+        "straubenhardt": "Gemeindebibliothek Straubenhardt",
+        "tettnang": "Stadtbücherei Tettnang",
+        "waldenbuch": "Stadtbücherei Waldenbuch",
+        "wangen": "Stadtbücherei im Kornhaus, Wangen im Allgäu",
+        "manual": "Enter URL manually"
+      }
     }
   },
   "services": {

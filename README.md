@@ -29,13 +29,14 @@ Copy `custom_components/lissy/` into your HA `config/custom_components/` folder 
 
 ## Configuration
 
-During setup you will be asked for:
+During setup you first pick your library, then log in:
 
 | Field | Description |
 |---|---|
+| Library | Your library, chosen from a dropdown. If it is not listed, select "Enter URL manually" to enter the portal URL yourself — and please [open an issue](https://github.com/jd1/ha-lissy/issues) so the library can be added to the dropdown |
+| Lissy URL | URL of your Lissy portal (manual entry only; must end with lissy/lissy.ly) |
 | Username | Your library account username |
 | Password | Your library account password |
-| Base URL | URL of your Lissy portal (optional if using the default) |
 
 ## Options
 
