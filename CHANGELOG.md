@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.0](https://github.com/jd1/ha-lissy/compare/v0.7.0...v0.8.0) (2026-11-12)
+
+
+### Features
+
+* **config_flow:** offer the barcode toggle at initial setup ([352d086](https://github.com/jd1/ha-lissy/commit/352d086dfdd8863dfb4ca2c2d7aadddbb36ff7c4))
+
+
+### Bug Fixes
+
+* **api:** parse loans when the renewal checkbox column is missing ([c90c7a4](https://github.com/jd1/ha-lissy/commit/c90c7a4b5fce7360a38b484097fafaded2ebca43))
+
 ## [0.7.0](https://github.com/jd1/ha-lissy/compare/v0.6.0...v0.7.0) (2026-10-23)
 
 
